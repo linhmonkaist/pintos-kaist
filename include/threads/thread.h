@@ -98,15 +98,13 @@ struct thread {
 
 	/* Solution */
 	int64_t ticks;                      /* Saved ticks */
-	int effective_priority;             /* Effective Priority */
+	int donated_priority;             /* Effective Priority */
 	struct list_elem lock_elem;         /* for waiters in struct lock */
 	struct list locks;                  /* List of locks thread hold */
 
 	struct lock *waiting_lock;
-	struct thread *donator;
-	struct thread *donatee;
 	int nice;
-	FP recent_cpu;
+	int32_t recent_cpu;
 	/* Solution done. */
 
 #ifdef USERPROG
