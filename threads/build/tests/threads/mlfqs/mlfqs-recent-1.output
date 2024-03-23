@@ -1,0 +1,108 @@
+Kernel command line: -q -mlfqs run mlfqs-recent-1
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  209,510,400 loops/s.
+Boot complete.
+Executing 'mlfqs-recent-1':
+(mlfqs-recent-1) begin
+(mlfqs-recent-1) Sleeping 10 seconds to allow recent_cpu to decay, please wait...
+(mlfqs-recent-1) After 2 seconds, recent_cpu is 8.39, load_avg is 0.03.
+(mlfqs-recent-1) After 4 seconds, recent_cpu is 14.57, load_avg is 0.06.
+(mlfqs-recent-1) After 6 seconds, recent_cpu is 20.58, load_avg is 0.09.
+(mlfqs-recent-1) After 8 seconds, recent_cpu is 26.38, load_avg is 0.12.
+(mlfqs-recent-1) After 10 seconds, recent_cpu is 32.01, load_avg is 0.15.
+(mlfqs-recent-1) After 12 seconds, recent_cpu is 37.46, load_avg is 0.18.
+(mlfqs-recent-1) After 14 seconds, recent_cpu is 42.74, load_avg is 0.20.
+(mlfqs-recent-1) After 16 seconds, recent_cpu is 47.86, load_avg is 0.23.
+(mlfqs-recent-1) After 18 seconds, recent_cpu is 52.81, load_avg is 0.26.
+(mlfqs-recent-1) After 20 seconds, recent_cpu is 57.61, load_avg is 0.28.
+(mlfqs-recent-1) After 22 seconds, recent_cpu is 62.26, load_avg is 0.30.
+(mlfqs-recent-1) After 24 seconds, recent_cpu is 66.75, load_avg is 0.33.
+(mlfqs-recent-1) After 26 seconds, recent_cpu is 71.11, load_avg is 0.35.
+(mlfqs-recent-1) After 28 seconds, recent_cpu is 75.33, load_avg is 0.37.
+(mlfqs-recent-1) After 30 seconds, recent_cpu is 79.41, load_avg is 0.39.
+(mlfqs-recent-1) After 32 seconds, recent_cpu is 83.37, load_avg is 0.41.
+(mlfqs-recent-1) After 34 seconds, recent_cpu is 87.21, load_avg is 0.43.
+(mlfqs-recent-1) After 36 seconds, recent_cpu is 90.92, load_avg is 0.45.
+(mlfqs-recent-1) After 38 seconds, recent_cpu is 94.51, load_avg is 0.47.
+(mlfqs-recent-1) After 40 seconds, recent_cpu is 97.99, load_avg is 0.48.
+(mlfqs-recent-1) After 42 seconds, recent_cpu is 101.36, load_avg is 0.50.
+(mlfqs-recent-1) After 44 seconds, recent_cpu is 104.62, load_avg is 0.52.
+(mlfqs-recent-1) After 46 seconds, recent_cpu is 107.77, load_avg is 0.53.
+(mlfqs-recent-1) After 48 seconds, recent_cpu is 110.83, load_avg is 0.55.
+(mlfqs-recent-1) After 50 seconds, recent_cpu is 113.79, load_avg is 0.56.
+(mlfqs-recent-1) After 52 seconds, recent_cpu is 116.66, load_avg is 0.58.
+(mlfqs-recent-1) After 54 seconds, recent_cpu is 119.44, load_avg is 0.59.
+(mlfqs-recent-1) After 56 seconds, recent_cpu is 122.12, load_avg is 0.60.
+(mlfqs-recent-1) After 58 seconds, recent_cpu is 124.71, load_avg is 0.62.
+(mlfqs-recent-1) After 60 seconds, recent_cpu is 127.22, load_avg is 0.63.
+(mlfqs-recent-1) After 62 seconds, recent_cpu is 129.65, load_avg is 0.64.
+(mlfqs-recent-1) After 64 seconds, recent_cpu is 132.00, load_avg is 0.65.
+(mlfqs-recent-1) After 66 seconds, recent_cpu is 134.27, load_avg is 0.66.
+(mlfqs-recent-1) After 68 seconds, recent_cpu is 136.46, load_avg is 0.67.
+(mlfqs-recent-1) After 70 seconds, recent_cpu is 138.59, load_avg is 0.69.
+(mlfqs-recent-1) After 72 seconds, recent_cpu is 140.65, load_avg is 0.70.
+(mlfqs-recent-1) After 74 seconds, recent_cpu is 142.64, load_avg is 0.71.
+(mlfqs-recent-1) After 76 seconds, recent_cpu is 144.58, load_avg is 0.71.
+(mlfqs-recent-1) After 78 seconds, recent_cpu is 146.44, load_avg is 0.72.
+(mlfqs-recent-1) After 80 seconds, recent_cpu is 148.25, load_avg is 0.73.
+(mlfqs-recent-1) After 82 seconds, recent_cpu is 149.99, load_avg is 0.74.
+(mlfqs-recent-1) After 84 seconds, recent_cpu is 151.69, load_avg is 0.75.
+(mlfqs-recent-1) After 86 seconds, recent_cpu is 153.32, load_avg is 0.76.
+(mlfqs-recent-1) After 88 seconds, recent_cpu is 154.90, load_avg is 0.77.
+(mlfqs-recent-1) After 90 seconds, recent_cpu is 156.43, load_avg is 0.77.
+(mlfqs-recent-1) After 92 seconds, recent_cpu is 157.91, load_avg is 0.78.
+(mlfqs-recent-1) After 94 seconds, recent_cpu is 159.34, load_avg is 0.79.
+(mlfqs-recent-1) After 96 seconds, recent_cpu is 160.73, load_avg is 0.79.
+(mlfqs-recent-1) After 98 seconds, recent_cpu is 162.06, load_avg is 0.80.
+(mlfqs-recent-1) After 100 seconds, recent_cpu is 163.36, load_avg is 0.81.
+(mlfqs-recent-1) After 102 seconds, recent_cpu is 164.62, load_avg is 0.81.
+(mlfqs-recent-1) After 104 seconds, recent_cpu is 165.84, load_avg is 0.82.
+(mlfqs-recent-1) After 106 seconds, recent_cpu is 167.01, load_avg is 0.82.
+(mlfqs-recent-1) After 108 seconds, recent_cpu is 168.14, load_avg is 0.83.
+(mlfqs-recent-1) After 110 seconds, recent_cpu is 169.24, load_avg is 0.84.
+(mlfqs-recent-1) After 112 seconds, recent_cpu is 170.31, load_avg is 0.84.
+(mlfqs-recent-1) After 114 seconds, recent_cpu is 171.33, load_avg is 0.85.
+(mlfqs-recent-1) After 116 seconds, recent_cpu is 172.32, load_avg is 0.85.
+(mlfqs-recent-1) After 118 seconds, recent_cpu is 173.28, load_avg is 0.86.
+(mlfqs-recent-1) After 120 seconds, recent_cpu is 174.22, load_avg is 0.86.
+(mlfqs-recent-1) After 122 seconds, recent_cpu is 175.12, load_avg is 0.86.
+(mlfqs-recent-1) After 124 seconds, recent_cpu is 175.99, load_avg is 0.87.
+(mlfqs-recent-1) After 126 seconds, recent_cpu is 176.83, load_avg is 0.87.
+(mlfqs-recent-1) After 128 seconds, recent_cpu is 177.64, load_avg is 0.88.
+(mlfqs-recent-1) After 130 seconds, recent_cpu is 178.43, load_avg is 0.88.
+(mlfqs-recent-1) After 132 seconds, recent_cpu is 179.19, load_avg is 0.88.
+(mlfqs-recent-1) After 134 seconds, recent_cpu is 179.93, load_avg is 0.89.
+(mlfqs-recent-1) After 136 seconds, recent_cpu is 180.65, load_avg is 0.89.
+(mlfqs-recent-1) After 138 seconds, recent_cpu is 181.34, load_avg is 0.89.
+(mlfqs-recent-1) After 140 seconds, recent_cpu is 182.00, load_avg is 0.90.
+(mlfqs-recent-1) After 142 seconds, recent_cpu is 182.65, load_avg is 0.90.
+(mlfqs-recent-1) After 144 seconds, recent_cpu is 183.27, load_avg is 0.90.
+(mlfqs-recent-1) After 146 seconds, recent_cpu is 183.87, load_avg is 0.91.
+(mlfqs-recent-1) After 148 seconds, recent_cpu is 184.45, load_avg is 0.91.
+(mlfqs-recent-1) After 150 seconds, recent_cpu is 185.02, load_avg is 0.91.
+(mlfqs-recent-1) After 152 seconds, recent_cpu is 185.56, load_avg is 0.92.
+(mlfqs-recent-1) After 154 seconds, recent_cpu is 186.09, load_avg is 0.92.
+(mlfqs-recent-1) After 156 seconds, recent_cpu is 186.60, load_avg is 0.92.
+(mlfqs-recent-1) After 158 seconds, recent_cpu is 187.09, load_avg is 0.92.
+(mlfqs-recent-1) After 160 seconds, recent_cpu is 187.57, load_avg is 0.93.
+(mlfqs-recent-1) After 162 seconds, recent_cpu is 188.03, load_avg is 0.93.
+(mlfqs-recent-1) After 164 seconds, recent_cpu is 188.48, load_avg is 0.93.
+(mlfqs-recent-1) After 166 seconds, recent_cpu is 188.91, load_avg is 0.93.
+(mlfqs-recent-1) After 168 seconds, recent_cpu is 189.33, load_avg is 0.93.
+(mlfqs-recent-1) After 170 seconds, recent_cpu is 189.73, load_avg is 0.94.
+(mlfqs-recent-1) After 172 seconds, recent_cpu is 190.12, load_avg is 0.94.
+(mlfqs-recent-1) After 174 seconds, recent_cpu is 190.50, load_avg is 0.94.
+(mlfqs-recent-1) After 176 seconds, recent_cpu is 190.86, load_avg is 0.94.
+(mlfqs-recent-1) After 178 seconds, recent_cpu is 191.21, load_avg is 0.94.
+(mlfqs-recent-1) After 180 seconds, recent_cpu is 191.56, load_avg is 0.94.
+(mlfqs-recent-1) end
+Execution of 'mlfqs-recent-1' complete.
+Timer: 19001 ticks
+Thread: 961 idle ticks, 18040 kernel ticks, 0 user ticks
+Console: 7290 characters output
+Keyboard: 0 keys pressed
+Powering off...

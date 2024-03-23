@@ -10,11 +10,11 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "devices/timer.h"
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#include "devices/timer.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -41,10 +41,8 @@ static struct lock tid_lock;
 /* Thread destruction requests */
 static struct list destruction_req;
 
-/* Solution */
-/* List of blocked processes */
 struct list block_list;
-FP load_avg;
+int32_t load_avg;
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -115,11 +113,9 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
-	/* Solution */
 	list_init (&block_list);
 	if (thread_mlfqs)
 		load_avg = 0;
-	/* Solution done. */
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -145,32 +141,11 @@ thread_start (void) {
 }
 
 /* Solution */
-static void
-thread_for_each (void (*action)(struct thread *)) {
-	struct list_elem *e;
-	 for (e = list_begin (&ready_list); e != list_end (&ready_list);
-			 e = list_next (e)) {
-		 struct thread *t = list_entry (e, struct thread, elem);
-		 action (t);
-	 }
-	 for (e = list_begin (&block_list); e != list_end (&block_list);
-			 e = list_next (e)) {
-		 struct thread *t = list_entry (e, struct thread, elem);
-		 action (t);
-	 }
-	 if (thread_current () != idle_thread) {
-		 action (thread_current ());
-	 }
-}
-
-static void
-calc_recent_cpu (struct thread *t) {
+void helper_recent_cpu (struct thread *t) {
 	t->recent_cpu = DIV (MUL (MUL (FP (2), load_avg), t->recent_cpu),
 			MUL (FP (2), load_avg) + FP (1)) + FP (t->nice);
 }
-
-static void
-calc_priority (struct thread *t) {
+void helper_priority (struct thread *t) {
 	t->priority = PRI_MAX - FP2INT (DIV (t->recent_cpu, FP (4))) - 2 * t->nice;
 	if (t->priority > PRI_MAX)
 		t->priority = PRI_MAX;
@@ -179,6 +154,39 @@ calc_priority (struct thread *t) {
 
 	t->effective_priority = t->priority;
 }
+void traverse_threads_recent_cpu() {
+	struct list_elem *e;
+	 for (e = list_begin (&ready_list); e != list_end (&ready_list);
+			 e = list_next (e)) {
+		 struct thread *t = list_entry (e, struct thread, elem);
+		 helper_recent_cpu(t);
+	 }
+	 for (e = list_begin (&block_list); e != list_end (&block_list);
+			 e = list_next (e)) {
+		 struct thread *t = list_entry (e, struct thread, elem);
+		 helper_recent_cpu (t);
+	 }
+	 if (thread_current () != idle_thread) {
+		 helper_recent_cpu (thread_current ());
+	 }
+}
+void traverse_threads_priority() {
+	struct list_elem *e;
+	 for (e = list_begin (&ready_list); e != list_end (&ready_list);
+			 e = list_next (e)) {
+		 struct thread *t = list_entry (e, struct thread, elem);
+		 helper_priority(t);
+	 }
+	 for (e = list_begin (&block_list); e != list_end (&block_list);
+			 e = list_next (e)) {
+		 struct thread *t = list_entry (e, struct thread, elem);
+		 helper_priority (t);
+	 }
+	 if (thread_current () != idle_thread) {
+		 helper_priority (thread_current ());
+	 }
+}
+
 /* Solution done. */
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -203,7 +211,7 @@ thread_tick (void) {
 		if (timer_ticks () % TIMER_FREQ == 0) {
 			load_avg = DIV (MUL (FP (59), load_avg), FP (60)) +
 				DIV (FP (rthreads), FP (60));
-			thread_for_each (calc_recent_cpu);
+			traverse_threads_recent_cpu();
 		}
 		/* if current thread is not idle thread add 1 to recent_cpu */
 		if (t != idle_thread) {
@@ -211,7 +219,7 @@ thread_tick (void) {
 		}
 		/* every 4 ticks, update priority of all threads. */
 		if (timer_ticks() % 4 == 3) {
-			 thread_for_each (calc_priority);
+			traverse_threads_priority();
 		}
 	}
 	/* Solution done. */
@@ -274,8 +282,9 @@ thread_create (const char *name, int priority,
 	if (thread_mlfqs) {
 		t->recent_cpu = thread_current ()->recent_cpu;
 		t->nice = thread_current ()->nice;
-		calc_priority (t);
+		helper_priority (t);
 	}
+	/* Solution done. */
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -409,7 +418,7 @@ thread_set_nice (int nice UNUSED) {
 	/* TODO: Your implementation goes here */
 	/* Solution */
 	thread_current ()->nice = nice;
-	calc_priority (thread_current ());
+	helper_priority (thread_current ());
 	/* Solution done. */
 }
 

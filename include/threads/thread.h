@@ -163,5 +163,9 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+void helper_recent_cpu (struct thread *t); 
+void helper_priority (struct thread *t); 
+void traverse_threads_recent_cpu(void); 
+void traverse_threads_priority(void); 
 
 #endif /* threads/thread.h */
