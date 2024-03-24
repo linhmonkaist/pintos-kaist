@@ -108,7 +108,8 @@ timer_sleep (int64_t ticks) {
 	struct thread *th = thread_current ();
 	enum intr_level old_level = intr_disable ();
 	th->ticks = ticks + start;
-	list_insert_ordered (&block_list, &th->elem, compare_tick, NULL);
+	// list_insert_ordered (&block_list, &th->elem, compare_tick, NULL);
+	list_push_back(&block_list, &th->elem); 
 	thread_block ();
 	intr_set_level(old_level);
 
@@ -145,16 +146,24 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick ();
 
 	/* Solution */
-	struct thread *th;
-
 	while (!list_empty (&block_list)) {
-		th = list_entry (list_front (&block_list), struct thread, elem);
+		struct list_elem *elem = list_min(&block_list, compare_tick, NULL);
+		struct thread *th = list_entry (elem, struct thread, elem);
 		if (ticks >= th->ticks) {
-			list_pop_front (&block_list);
+			list_remove (elem);
 			thread_unblock (th);
 		} else
 			break;
 	}
+
+	// while (!list_empty (&block_list)) {
+	// 	th = list_entry (list_front (&block_list), struct thread, elem);
+	// 	if (ticks >= th->ticks) {
+	// 		list_pop_front (&block_list);
+	// 		thread_unblock (th);
+	// 	} else
+	// 		break;
+	// }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
