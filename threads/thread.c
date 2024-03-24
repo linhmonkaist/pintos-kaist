@@ -146,13 +146,13 @@ thread_start (void) {
 
 /* Solution */
 void helper_recent_cpu (struct thread *t) {
-	t->recent_cpu = DIV (MUL (MUL (FP (2), load_avg), t->recent_cpu),
-			MUL (FP (2), load_avg) + FP (1)) + FP (t->nice);
-	// t -> recent_cpu = (((int64_t)((((int64_t)((((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))))) * (t->recent_cpu) / ((1 << 14))))) * ((1 << 14)) / ((((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))) + ((1) << 14))) + ((t->nice) << 14);
+	// t->recent_cpu = DIV (MUL (MUL (FP (2), load_avg), t->recent_cpu),
+			// MUL (FP (2), load_avg) + FP (1)) + FP (t->nice);
+	t -> recent_cpu = (((int64_t)((((int64_t)((((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))))) * (t->recent_cpu) / ((1 << 14))))) * ((1 << 14)) / ((((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))) + ((1) << 14))) + ((t->nice) << 14);
 }
 void helper_priority (struct thread *t) {
-	t->priority = PRI_MAX - FP2INT (DIV (t->recent_cpu, FP (4))) - 2 * t->nice;
-	// t->priority = PRI_MAX - (((((int64_t)(t->recent_cpu)) * ((1 << 14)) / (((4) << 14)))) >> 14) - 2 * t->nice;
+	// t->priority = PRI_MAX - FP2INT (DIV (t->recent_cpu, FP (4))) - 2 * t->nice;
+	t->priority = PRI_MAX - (((((int64_t)(t->recent_cpu)) * ((1 << 14)) / (((4) << 14)))) >> 14) - 2 * t->nice;
 	if (t->priority > PRI_MAX)
 		t->priority = PRI_MAX;
 	else if (t->priority < PRI_MIN)
@@ -207,15 +207,15 @@ thread_tick (void) {
 		uint64_t rthreads = list_size(&ready_list) + (t != idle_thread);
 		/* update load_avg and update recent_cpu of all threads per 1s. */
 		if (timer_ticks () % TIMER_FREQ == 0) {
-			load_avg = DIV (MUL (FP (59), load_avg), FP (60)) + DIV (FP (rthreads), FP (60));
-			// load_avg = (((int64_t)((((int64_t)(((59) << 14))) * (load_avg) / ((1 << 14))))) * ((1 << 14)) / (((60) << 14))) 
-			// 		+ (((int64_t)(((rthreads) << 14))) * ((1 << 14)) / (((60) << 14)));
+			// load_avg = DIV (MUL (FP (59), load_avg), FP (60)) + DIV (FP (rthreads), FP (60));
+			load_avg = (((int64_t)((((int64_t)(((59) << 14))) * (load_avg) / ((1 << 14))))) * ((1 << 14)) / (((60) << 14))) 
+					+ (((int64_t)(((rthreads) << 14))) * ((1 << 14)) / (((60) << 14)));
 			traverse_threads_recent_cpu();
 		}
 		/* if current thread is not idle thread add 1 to recent_cpu */
 		if (t != idle_thread) {
-			t->recent_cpu += FP (1);
-			// t -> recent_cpu += ((1) << 14); 
+			// t->recent_cpu += FP (1);
+			t -> recent_cpu += ((1) << 14); 
 		}
 		/* every 4 ticks, update priority of all threads. */
 		if (timer_ticks() % 4 == 3) {
@@ -455,8 +455,8 @@ int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
 	/* Solution */
-	return FP2INT (MUL (FP (100), load_avg));
-	// return (((((int64_t)(((100) << 14))) * (load_avg) / ((1 << 14)))) >> 14); 
+	// return FP2INT (MUL (FP (100), load_avg));
+	return (((((int64_t)(((100) << 14))) * (load_avg) / ((1 << 14)))) >> 14); 
 	/* Solution done. */
 }
 
@@ -465,8 +465,8 @@ int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
 	/* Solution */
-	return FP2INT (MUL (FP (100), thread_current ()->recent_cpu));
-	// return (((((int64_t)(((100) << 14))) * (thread_current ()->recent_cpu) / ((1 << 14)))) >> 14);
+	// return FP2INT (MUL (FP (100), thread_current ()->recent_cpu));
+	return (((((int64_t)(((100) << 14))) * (thread_current ()->recent_cpu) / ((1 << 14)))) >> 14);
 	/* Solution done.*/
 }
 
