@@ -146,20 +146,17 @@ thread_start (void) {
 
 /* Solution */
 void helper_recent_cpu (struct thread *t) {
-	// t->recent_cpu = DIV (MUL (MUL (FP (2), load_avg), t->recent_cpu),
-			// MUL (FP (2), load_avg) + FP (1)) + FP (t->nice);
 	t -> recent_cpu = (((int64_t)((((int64_t)((((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))))) * (t->recent_cpu) / ((1 << 14))))) * ((1 << 14)) / ((((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))) + ((1) << 14))) + ((t->nice) << 14);
 }
 void helper_priority (struct thread *t) {
-	// t->priority = PRI_MAX - FP2INT (DIV (t->recent_cpu, FP (4))) - 2 * t->nice;
 	t->priority = PRI_MAX - (((((int64_t)(t->recent_cpu)) * ((1 << 14)) / (((4) << 14)))) >> 14) - 2 * t->nice;
 	if (t->priority > PRI_MAX)
 		t->priority = PRI_MAX;
 	else if (t->priority < PRI_MIN)
 		t->priority = PRI_MIN;
-	// if (!thread_mlfqs){ //Mon add
+	if (!thread_mlfqs){ //Mon add
 		t->donated_priority = t->priority;
-	// }
+	}
 }
 void traverse_list(const struct list *A, void (*func)(struct thread *t)){
 	struct list_elem *e = list_begin (A);
@@ -207,14 +204,12 @@ thread_tick (void) {
 		uint64_t rthreads = list_size(&ready_list) + (t != idle_thread);
 		/* update load_avg and update recent_cpu of all threads per 1s. */
 		if (timer_ticks () % TIMER_FREQ == 0) {
-			// load_avg = DIV (MUL (FP (59), load_avg), FP (60)) + DIV (FP (rthreads), FP (60));
 			load_avg = (((int64_t)((((int64_t)(((59) << 14))) * (load_avg) / ((1 << 14))))) * ((1 << 14)) / (((60) << 14))) 
 					+ (((int64_t)(((rthreads) << 14))) * ((1 << 14)) / (((60) << 14)));
 			traverse_threads_recent_cpu();
 		}
 		/* if current thread is not idle thread add 1 to recent_cpu */
 		if (t != idle_thread) {
-			// t->recent_cpu += FP (1);
 			t -> recent_cpu += ((1) << 14); 
 		}
 		/* every 4 ticks, update priority of all threads. */
@@ -288,12 +283,14 @@ thread_create (const char *name, int priority, thread_func *function, void *aux)
 	thread_unblock (t);
 
 	/* Solution */
-	if (thread_current()->donated_priority < t-> donated_priority) {
+	if ((!thread_mlfqs) && (thread_current()->donated_priority < t-> donated_priority)) {
 		thread_yield ();
+	}
+	else if (thread_mlfqs && ((thread_current()-> priority < t-> priority)))
+		thread_yield(); 
 	/* Solution done. */
 
 	return tid;
-}
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -416,7 +413,6 @@ thread_set_priority (int new_priority) {
 	// //end
 	// current->priority = new_priority;
 	// if (list_empty (&current->locks))
-	// 	current -> donated_priority = new_priority; //Mon change to check
 	// thread_yield (); Mon comment
 	// //end solution
 }
@@ -455,7 +451,6 @@ int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
 	/* Solution */
-	// return FP2INT (MUL (FP (100), load_avg));
 	return (((((int64_t)(((100) << 14))) * (load_avg) / ((1 << 14)))) >> 14); 
 	/* Solution done. */
 }
@@ -465,7 +460,6 @@ int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
 	/* Solution */
-	// return FP2INT (MUL (FP (100), thread_current ()->recent_cpu));
 	return (((((int64_t)(((100) << 14))) * (thread_current ()->recent_cpu) / ((1 << 14)))) >> 14);
 	/* Solution done.*/
 }
@@ -531,7 +525,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	strlcpy (t->name, name, sizeof t->name);
 	t->priority = priority;
 	/* Solution */
-	t->donated_priority = priority;
+	if (!thread_mlfqs) 
+		t->donated_priority = priority;
 	list_init (&t->locks);
 	/* Solution done. */
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
@@ -541,10 +536,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 /* Solution */
 bool
-compare_priority (const struct list_elem *A,
-		const struct list_elem *B, void *aux UNUSED) {
+compare_priority (const struct list_elem *A, const struct list_elem *B, void *aux UNUSED) {
 	const struct thread *threadA = list_entry (A, struct thread, elem);
 	const struct thread *threadB = list_entry (B, struct thread, elem);
+	if (thread_mlfqs) return threadA -> priority < threadB -> priority; 
 	return threadA->donated_priority < threadB-> donated_priority;
 }
 /* Solution done. */

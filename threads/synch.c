@@ -125,8 +125,13 @@ sema_up (struct semaphore *sema) {
 	/* Solution done. */
 	sema->value++;
 	//solution
+	if (!thread_mlfqs) {
 	if (!intr_context () && th && th->donated_priority > thread_current ()->donated_priority)
 		thread_yield();
+	} else {
+	if (!intr_context () && th && th->priority > thread_current ()->priority)
+		thread_yield();
+	}
 	// if (!intr_context () && th && th->priority > thread_current ()->priority)
 	// 	thread_yield();
 	//solution done
@@ -201,6 +206,7 @@ static bool
 compare_priority_in_lock (const struct list_elem *A, const struct list_elem *B, void *aux UNUSED) {
     const struct thread *threadA = list_entry (A, struct thread, lock_elem);
     const struct thread *threadB = list_entry (B, struct thread, lock_elem);
+	if (thread_mlfqs) return threadA->priority < threadB->priority;
     return threadA->donated_priority < threadB->donated_priority;
 }
 
