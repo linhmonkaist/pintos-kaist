@@ -41,7 +41,7 @@ static struct lock tid_lock;
 /* Thread destruction requests */
 static struct list destruction_req;
 //solution
-struct list block_list;
+struct list sleep_list;
 int32_t load_avg;
 //done
 
@@ -114,7 +114,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
-	list_init (&block_list);
+	list_init (&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -145,8 +145,11 @@ thread_start (void) {
 }
 
 /* Solution */
+int cal_load_avg(int32_t load_avg){
+	return (((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))); 
+}
 void helper_recent_cpu (struct thread *t) {
-	t -> recent_cpu = (((int64_t)((((int64_t)((((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))))) * (t->recent_cpu) / ((1 << 14))))) * ((1 << 14)) / ((((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))) + ((1) << 14))) + ((t->nice) << 14);
+	t -> recent_cpu = (((int64_t)((((int64_t)(cal_load_avg(load_avg))) * (t->recent_cpu) / ((1 << 14))))) * ((1 << 14)) / (cal_load_avg(load_avg) + ((1) << 14))) + ((t->nice) << 14);
 }
 void helper_priority (struct thread *t) {
 	t->priority = PRI_MAX - (((((int64_t)(t->recent_cpu)) * ((1 << 14)) / (((4) << 14)))) >> 14) - 2 * t->nice;
@@ -168,17 +171,17 @@ void traverse_list(const struct list *A, void (*func)(struct thread *t)){
 }
 void traverse_threads_recent_cpu() {
 	traverse_list(&ready_list, helper_recent_cpu); 
-	traverse_list(&block_list, helper_recent_cpu); 
-	 if (thread_current () != idle_thread) {
+	traverse_list(&sleep_list, helper_recent_cpu); 
+	if (thread_current () != idle_thread) {
 		 helper_recent_cpu (thread_current ());
-	 }
+	}
 }
 void traverse_threads_priority() {
 	traverse_list(&ready_list, helper_priority); 
-	traverse_list(&block_list, helper_priority); 
-	 if (thread_current () != idle_thread) {
+	traverse_list(&sleep_list, helper_priority); 
+	if (thread_current () != idle_thread) {
 		 helper_priority (thread_current ());
-	 }
+	}
 }
 
 /* Solution done. */
@@ -202,8 +205,9 @@ thread_tick (void) {
 /* Solution */
 	if (thread_mlfqs) {
 		uint64_t rthreads = list_size(&ready_list) + (t != idle_thread);
+		int64_t got_timer_tick = timer_ticks(); 
 		/* update load_avg and update recent_cpu of all threads per 1s. */
-		if (timer_ticks () % TIMER_FREQ == 0) {
+		if (got_timer_tick % 100 == 0) {
 			load_avg = (((int64_t)((((int64_t)(((59) << 14))) * (load_avg) / ((1 << 14))))) * ((1 << 14)) / (((60) << 14))) 
 					+ (((int64_t)(((rthreads) << 14))) * ((1 << 14)) / (((60) << 14)));
 			traverse_threads_recent_cpu();
@@ -213,7 +217,7 @@ thread_tick (void) {
 			t -> recent_cpu += ((1) << 14); 
 		}
 		/* every 4 ticks, update priority of all threads. */
-		if (timer_ticks() % 4 == 3) {
+		if ( got_timer_tick % 4 == 3) {
 			traverse_threads_priority();
 		}
 	}
@@ -273,9 +277,10 @@ thread_create (const char *name, int priority, thread_func *function, void *aux)
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 	/* Solution */
+	struct thread *th_cur = thread_current(); 
 	if (thread_mlfqs) {
-		t->recent_cpu = thread_current ()->recent_cpu;
-		t->nice = thread_current ()->nice;
+		t->recent_cpu = th_cur ->recent_cpu;
+		t->nice = th_cur ->nice;
 		helper_priority (t);
 	}
 	/* Solution done. */
@@ -283,10 +288,10 @@ thread_create (const char *name, int priority, thread_func *function, void *aux)
 	thread_unblock (t);
 
 	/* Solution */
-	if ((!thread_mlfqs) && (thread_current()->donated_priority < t-> donated_priority)) {
+	if ((!thread_mlfqs) && (th_cur ->donated_priority < t-> donated_priority)) {
 		thread_yield ();
 	}
-	else if (thread_mlfqs && ((thread_current()-> priority < t-> priority)))
+	else if (thread_mlfqs && ((th_cur -> priority < t-> priority)))
 		thread_yield(); 
 	/* Solution done. */
 
@@ -431,9 +436,10 @@ void
 thread_set_nice (int nice UNUSED) {
 	//Not change
 	/* Solution */
-	thread_current ()->nice = nice;
+	struct thread *t = thread_current(); 
+	t ->nice = nice;
 
-	helper_priority (thread_current()); //Mon
+	helper_priority (t); //Mon
 	/* Solution done. */
 }
 
@@ -442,7 +448,8 @@ int
 thread_get_nice (void) {
 	//not change
 	/* Solution */
-	return thread_current() -> nice;
+	struct thread *t = thread_current(); 
+	return t -> nice;
 	/* Solution done. */
 }
 
@@ -460,7 +467,8 @@ int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
 	/* Solution */
-	return (((((int64_t)(((100) << 14))) * (thread_current ()->recent_cpu) / ((1 << 14)))) >> 14);
+	int32_t cur_cpu = thread_current() -> recent_cpu; 
+	return (((((int64_t)(((100) << 14))) * (cur_cpu) / ((1 << 14)))) >> 14);
 	/* Solution done.*/
 }
 
@@ -558,10 +566,30 @@ next_thread_to_run (void) {
 		return list_entry (list_pop_front (&ready_list), struct thread, elem);
 	*/
 	/* Solution */
-	struct list_elem *elem = list_max (&ready_list, compare_priority, NULL);
-	struct thread *th = list_entry (elem, struct thread, elem);
-	list_remove (elem);
-	return th;
+	struct list_elem *e = list_begin (&ready_list);
+	struct list_elem *max_elem = e;
+	struct thread *next_run = list_entry(e, struct thread, elem); 
+	while(e != list_end(&ready_list)){
+		struct thread *t = list_entry (e, struct thread, elem);
+		if (thread_mlfqs){
+			if (next_run -> priority < t -> priority){
+				next_run = t; 
+				max_elem = e; 
+			}
+		} else {
+			if (next_run -> donated_priority < t -> donated_priority){
+				next_run = t; 
+				max_elem = e; 
+			}
+		}
+		e = list_next (e);
+	}
+	list_remove(max_elem);
+	return next_run; 
+	// struct list_elem *elem = list_max (&ready_list, compare_priority, NULL);
+	// struct thread *th = list_entry (elem, struct thread, elem);
+	// list_remove (elem);
+	// return th;
 	//solution done
 }
 

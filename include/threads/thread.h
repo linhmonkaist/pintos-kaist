@@ -127,7 +127,7 @@ struct thread {
 extern bool thread_mlfqs;
 
 /* Solution */
-struct list block_list;
+struct list sleep_list;
 bool compare_priority (const struct list_elem *A,
 		const struct list_elem *B, void *aux UNUSED);
 

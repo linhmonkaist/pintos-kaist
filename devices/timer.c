@@ -109,7 +109,7 @@ timer_sleep (int64_t ticks) {
 	enum intr_level old_level = intr_disable ();
 	th->ticks = ticks + start;
 	// list_insert_ordered (&block_list, &th->elem, compare_tick, NULL);
-	list_push_back(&block_list, &th->elem); 
+	list_push_back(&sleep_list, &th->elem); 
 	thread_block ();
 	intr_set_level(old_level);
 
@@ -146,8 +146,8 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick ();
 
 	/* Solution */
-	while (!list_empty (&block_list)) {
-		struct list_elem *elem = list_min(&block_list, compare_tick, NULL);
+	while (!list_empty (&sleep_list)) {
+		struct list_elem *elem = list_min(&sleep_list, compare_tick, NULL);
 		struct thread *th = list_entry (elem, struct thread, elem);
 		if (ticks >= th->ticks) {
 			list_remove (elem);
