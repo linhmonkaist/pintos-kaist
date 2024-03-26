@@ -542,16 +542,6 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
 }
 
-/* Solution */
-bool
-compare_priority (const struct list_elem *A, const struct list_elem *B, void *aux UNUSED) {
-	const struct thread *threadA = list_entry (A, struct thread, elem);
-	const struct thread *threadB = list_entry (B, struct thread, elem);
-	if (thread_mlfqs) return threadA -> priority < threadB -> priority; 
-	return threadA->donated_priority < threadB-> donated_priority;
-}
-/* Solution done. */
-
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it

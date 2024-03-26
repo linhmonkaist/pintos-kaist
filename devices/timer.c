@@ -108,7 +108,6 @@ timer_sleep (int64_t ticks) {
 	struct thread *th = thread_current ();
 	enum intr_level old_level = intr_disable ();
 	th->ticks = ticks + start;
-	// list_insert_ordered (&block_list, &th->elem, compare_tick, NULL);
 	list_push_back(&sleep_list, &th->elem); 
 	thread_block ();
 	intr_set_level(old_level);
@@ -147,14 +146,31 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 
 	/* Solution */
 	while (!list_empty (&sleep_list)) {
-		struct list_elem *elem = list_min(&sleep_list, compare_tick, NULL);
-		struct thread *th = list_entry (elem, struct thread, elem);
-		if (ticks >= th->ticks) {
-			list_remove (elem);
-			thread_unblock (th);
+		struct list_elem *e = list_begin (&sleep_list);
+		struct list_elem *min_elem = e;
+		struct thread *next_run = list_entry(e, struct thread, elem); 
+		while(e != list_end(&sleep_list)){
+			struct thread *t = list_entry (e, struct thread, elem);
+			if (next_run -> ticks > t -> ticks){
+				next_run = t; 
+				min_elem = e; 
+			}
+			e = list_next (e);
+		}
+		if (ticks >= next_run ->ticks) {
+			list_remove (min_elem);
+			thread_unblock (next_run);
 		} else
 			break;
-	}
+	// list_remove(max_elem);
+	// 	struct list_elem *elem = list_min(&sleep_list, compare_tick, NULL);
+	// 	struct thread *th = list_entry (elem, struct thread, elem);
+	// 	if (ticks >= th->ticks) {
+	// 		list_remove (elem);
+	// 		thread_unblock (th);
+	// 	} else
+	// 		break;
+	// }
 
 	// while (!list_empty (&block_list)) {
 	// 	th = list_entry (list_front (&block_list), struct thread, elem);
@@ -163,7 +179,7 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	// 		thread_unblock (th);
 	// 	} else
 	// 		break;
-	// }
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

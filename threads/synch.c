@@ -117,9 +117,27 @@ sema_up (struct semaphore *sema) {
 	/* Solution */
 	struct thread *th = NULL;
 	if (!list_empty (&sema->waiters)) {
-		struct list_elem *elem = list_max (&sema->waiters, compare_priority, NULL);
-		th = list_entry(elem, struct thread, elem);
-		list_remove (elem);
+		struct list_elem *e = list_begin (&sema->waiters);
+		struct list_elem *max_elem = e;
+		struct thread *next_run = list_entry(e, struct thread, elem); 
+		while(e != list_end(&sema->waiters)){
+			struct thread *t = list_entry (e, struct thread, elem);
+			if (thread_mlfqs){
+				if (next_run -> priority < t -> priority){
+					next_run = t; 
+					max_elem = e; 
+				}
+			} else {
+				if (next_run -> donated_priority < t -> donated_priority){
+					next_run = t; 
+					max_elem = e; 
+				}
+			}
+			e = list_next (e);
+		}
+		// struct list_elem *elem = list_max (&sema->waiters, compare_priority, NULL);
+		th = list_entry(max_elem, struct thread, elem);
+		list_remove (max_elem);
 		thread_unblock (th);
 	}
 	/* Solution done. */
@@ -400,16 +418,52 @@ compare_priority_cond (const struct list_elem *A,
 		&list_entry (A, struct semaphore_elem, elem)->semaphore;
 	struct semaphore *semaphoreB =
 		&list_entry (B, struct semaphore_elem, elem)->semaphore;
-	const struct thread *threadA;
-	const struct thread *threadB;
-
-	threadA = list_entry (
-			list_max (&semaphoreA->waiters, compare_priority, NULL),
-			struct thread, elem);
-	threadB = list_entry (
-			list_max (&semaphoreB->waiters, compare_priority, NULL),
-			struct thread, elem);
-	return threadA->priority < threadB->priority;
+	// const struct thread *threadA;
+	// const struct thread *threadB;
+	
+	struct list_elem *e = list_begin (&semaphoreA->waiters);
+	struct list_elem *max_elem_A = e;
+	struct thread *next_run_A = list_entry(e, struct thread, elem); 
+	while(e != list_end(&semaphoreA->waiters)){
+		struct thread *t = list_entry (e, struct thread, elem);
+		if (thread_mlfqs){
+			if (next_run_A -> priority < t -> priority){
+				next_run_A = t; 
+				max_elem_A = e; 
+			}
+		} else {
+			if (next_run_A -> donated_priority < t -> donated_priority){
+				next_run_A = t; 
+				max_elem_A = e; 
+			}
+		}
+		e = list_next (e);
+	}
+	e = list_begin (&semaphoreB->waiters);
+	struct list_elem *max_elem_B = e;
+	struct thread *next_run_B = list_entry(e, struct thread, elem); 
+	while(e != list_end(&semaphoreB->waiters)){
+		struct thread *t = list_entry (e, struct thread, elem);
+		if (thread_mlfqs){
+			if (next_run_B -> priority < t -> priority){
+				next_run_B = t; 
+				max_elem_B = e; 
+			}
+		} else {
+			if (next_run_B -> donated_priority < t -> donated_priority){
+				next_run_B = t; 
+				max_elem_B = e; 
+			}
+		}
+		e = list_next (e);
+	}
+	// threadA = list_entry (
+	// 		list_max (&semaphoreA->waiters, compare_priority, NULL),
+	// 		struct thread, elem);
+	// threadB = list_entry (
+	// 		list_max (&semaphoreB->waiters, compare_priority, NULL),
+	// 		struct thread, elem);
+	return next_run_A ->priority < next_run_B ->priority;
 }
 /* Solution done. */
 

@@ -128,8 +128,6 @@ extern bool thread_mlfqs;
 
 /* Solution */
 struct list sleep_list;
-bool compare_priority (const struct list_elem *A,
-		const struct list_elem *B, void *aux UNUSED);
 
 /* Solution done. */
 
