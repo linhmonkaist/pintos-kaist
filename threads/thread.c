@@ -40,7 +40,7 @@ static struct lock tid_lock;
 
 /* Thread destruction requests */
 static struct list destruction_req;
-//solution
+//Mon
 struct list sleep_list;
 int32_t load_avg;
 //done
@@ -123,7 +123,7 @@ thread_init (void) {
 	initial_thread->tid = allocate_tid ();
 	initial_thread -> nice = 0; //Mon
 	initial_thread -> recent_cpu = 0; //Mon add for init recent cpu
-	//solution
+	//Mon chua mofify
 	if (thread_mlfqs)
 		load_avg = 0;
 }
@@ -144,7 +144,7 @@ thread_start (void) {
 	sema_down (&idle_started);
 }
 
-/* Solution */
+/* Mon */
 int cal_load_avg(int32_t load_avg){
 	return (((int64_t)(((2) << 14))) * (load_avg) / ((1 << 14))); 
 }
@@ -172,19 +172,21 @@ void traverse_list(const struct list *A, void (*func)(struct thread *t)){
 void traverse_threads_recent_cpu() {
 	traverse_list(&ready_list, helper_recent_cpu); 
 	traverse_list(&sleep_list, helper_recent_cpu); 
-	if (thread_current () != idle_thread) {
+	struct thread *t = thread_current();
+	if (t != idle_thread) {
 		 helper_recent_cpu (thread_current ());
 	}
 }
 void traverse_threads_priority() {
 	traverse_list(&ready_list, helper_priority); 
 	traverse_list(&sleep_list, helper_priority); 
-	if (thread_current () != idle_thread) {
+	struct thread *t = thread_current();
+	if (t != idle_thread) {
 		 helper_priority (thread_current ());
 	}
 }
 
-/* Solution done. */
+/* Mon done. */
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
@@ -202,26 +204,29 @@ thread_tick (void) {
 	else
 		kernel_ticks++;
 
-/* Solution */
+/* Mon */
 	if (thread_mlfqs) {
 		uint64_t rthreads = list_size(&ready_list) + (t != idle_thread);
 		int64_t got_timer_tick = timer_ticks(); 
 		/* update load_avg and update recent_cpu of all threads per 1s. */
 		if (got_timer_tick % 100 == 0) {
+			int64_t plus = (((int64_t)(((rthreads) << 14))) * ((1 << 14)) / (((60) << 14))); 
 			load_avg = (((int64_t)((((int64_t)(((59) << 14))) * (load_avg) / ((1 << 14))))) * ((1 << 14)) / (((60) << 14))) 
-					+ (((int64_t)(((rthreads) << 14))) * ((1 << 14)) / (((60) << 14)));
+					+ plus;
 			traverse_threads_recent_cpu();
 		}
 		/* if current thread is not idle thread add 1 to recent_cpu */
 		if (t != idle_thread) {
-			t -> recent_cpu += ((1) << 14); 
+			int32_t shif = (1) << 14; 
+			t -> recent_cpu += shif; 
 		}
 		/* every 4 ticks, update priority of all threads. */
-		if ( got_timer_tick % 4 == 3) {
+		int64_t cal_mod = got_timer_tick % 4; 
+		if ( cal_mod == 3) {
 			traverse_threads_priority();
 		}
 	}
-	/* Solution done. */
+	/* Mon done. */
 
 	/* Enforce preemption. */
 	if (++thread_ticks >= TIME_SLICE)
@@ -276,24 +281,24 @@ thread_create (const char *name, int priority, thread_func *function, void *aux)
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
-	/* Solution */
+	/* Mon */
 	struct thread *th_cur = thread_current(); 
 	if (thread_mlfqs) {
 		t->recent_cpu = th_cur ->recent_cpu;
 		t->nice = th_cur ->nice;
 		helper_priority (t);
 	}
-	/* Solution done. */
+	/* Mon done. */
 	/* Add to run queue. */
 	thread_unblock (t);
 
-	/* Solution */
+	/* Mon */
 	if ((!thread_mlfqs) && (th_cur ->donated_priority < t-> donated_priority)) {
 		thread_yield ();
 	}
 	else if (thread_mlfqs && ((th_cur -> priority < t-> priority)))
 		thread_yield(); 
-	/* Solution done. */
+	/* Mon done. */
 
 	return tid;
 }
@@ -310,7 +315,6 @@ thread_block (void) {
 	ASSERT (intr_get_level () == INTR_OFF);
 	thread_current ()->status = THREAD_BLOCKED; //mon
 	schedule (); //mon
-	// do_schedule (THREAD_BLOCKED); //solution
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -401,7 +405,7 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	//thread_current ()->priority = new_priority;
-	/* Solution */
+	/* Mon */
 	struct thread *current = thread_current ();
 	//Mon add for mlfq
 	if (thread_mlfqs){
@@ -419,7 +423,7 @@ thread_set_priority (int new_priority) {
 	// current->priority = new_priority;
 	// if (list_empty (&current->locks))
 	// thread_yield (); Mon comment
-	// //end solution
+
 }
 
 /* Returns the current thread's priority. */
@@ -435,41 +439,41 @@ thread_get_priority (void) {
 void
 thread_set_nice (int nice UNUSED) {
 	//Not change
-	/* Solution */
+	/* Mon */
 	struct thread *t = thread_current(); 
 	t ->nice = nice;
 
 	helper_priority (t); //Mon
-	/* Solution done. */
+	/* Mon done. */
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
 	//not change
-	/* Solution */
+	/* Mon */
 	struct thread *t = thread_current(); 
 	return t -> nice;
-	/* Solution done. */
+	/* Mon done. */
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	/* Solution */
+	/* Mon */
 	return (((((int64_t)(((100) << 14))) * (load_avg) / ((1 << 14)))) >> 14); 
-	/* Solution done. */
+	/* Mon done. */
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
-	/* Solution */
+	/* Mon */
 	int32_t cur_cpu = thread_current() -> recent_cpu; 
 	return (((((int64_t)(((100) << 14))) * (cur_cpu) / ((1 << 14)))) >> 14);
-	/* Solution done.*/
+	/* Mon done.*/
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -532,11 +536,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->status = THREAD_BLOCKED;
 	strlcpy (t->name, name, sizeof t->name);
 	t->priority = priority;
-	/* Solution */
+	/* Mon not change */
 	if (!thread_mlfqs) 
-		t->donated_priority = priority;
+		t-> donated_priority = priority;
 	list_init (&t->locks);
-	/* Solution done. */
+	/* Mon done. */
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
@@ -555,7 +559,7 @@ next_thread_to_run (void) {
 	else
 		return list_entry (list_pop_front (&ready_list), struct thread, elem);
 	*/
-	/* Solution */
+	/* Mon */
 	struct list_elem *e = list_begin (&ready_list);
 	struct list_elem *max_elem = e;
 	struct thread *next_run = list_entry(e, struct thread, elem); 
@@ -580,7 +584,6 @@ next_thread_to_run (void) {
 	// struct thread *th = list_entry (elem, struct thread, elem);
 	// list_remove (elem);
 	// return th;
-	//solution done
 }
 
 /* Use iretq to launch the thread */

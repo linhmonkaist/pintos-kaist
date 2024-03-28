@@ -96,16 +96,16 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
-	/* Solution */
-	int64_t ticks;                      /* Saved ticks */
-	int donated_priority;             /* Effective Priority */
-	struct list_elem lock_elem;         /* for waiters in struct lock */
-	struct list locks;                  /* List of locks thread hold */
+	/* Mon */
+	int64_t ticks;                      
+	int donated_priority;            
+	struct list_elem lock_elem;       
+	struct list locks;                
 
 	struct lock *waiting_lock;
 	int nice;
 	int32_t recent_cpu;
-	/* Solution done. */
+	/* Mon done. */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -126,10 +126,10 @@ struct thread {
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-/* Solution */
+/* Mon */
 struct list sleep_list;
 
-/* Solution done. */
+/* Mon done. */
 
 void thread_init (void);
 void thread_start (void);
