@@ -67,6 +67,7 @@ initd (void *f_name) {
 	process_init ();
 
 	if (process_exec (f_name) < 0)
+		//make process run
 		PANIC("Fail to launch initd\n");
 	NOT_REACHED ();
 }
@@ -336,6 +337,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
+	//care about synchronization if someone also open this file 
 	file = filesys_open (file_name);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
@@ -417,6 +419,53 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
+	//place argument into stack
+	char *token, *save_ptr; 
+	int32_t counter = 0; 
+	int32_t arg_num = 0; 
+	int32_t i = 0; 
+	char *arr[20];
+	uintptr_t *arg_stack_add[20]; 
+	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
+		if (strlen(token) % 4 == 0) counter += strlen(token) / 4;
+		else counter += strlen(token)/ 4 + 1; 
+		arr[i] = token; 
+		arg_num ++; 
+	}
+	uintptr_t *cur = if_ -> rsp + 4;
+	if_ -> rsp += counter * 4;
+
+	//Push the data of string argument 
+	i = arg_num - 1; //index of the last argument
+	for (uintptr_t *k = cur; k <= if_ -> rsp; k += 4){
+		*k = arr[i];
+		arg_stack_add[i] = k; 
+		int word_align = strlen(arr[i]) % 4 == 0 ? strlen(arr[i]) / 4 - 1 : strlen(arr[i]) / 4; 
+		for (int w = 0; w < word_align; w ++){
+			k += 4; 
+			*k = 0; 
+		}
+		i--; 
+	}
+
+	//Go to next area
+	if_ -> rsp += 4;
+	cur = if_ -> rsp; //save current pointer to word-align
+
+	//Add string separator
+	*(uintptr_t *)(if_ -> rsp) = 0; 
+
+	//Push the data of string address
+	i = arg_num - 1;
+	for (uintptr_t *k = cur; k <= cur + 4*arg_num; k += 4){
+		*k = arg_stack_add[i];
+		(if_ -> rsp) += 4; 
+		i--; 
+	}
+
+
+
+
 	success = true;
 
 done:
@@ -425,7 +474,13 @@ done:
 	return success;
 }
 
+// static bool write_one_byte(uint8_t *udst, uint8_t byte){
+// 	int error_code; 
+// 	asm("movl $1f, %0; movb %b2, %1; 1:" : "=&a" (error_code), "=m" (*udst) : "q" (byte));
+// 	return error_code != -1;
+// }
 
+// static bool write_four_bytes(uint8_t *udst, )
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
 static bool

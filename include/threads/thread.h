@@ -107,6 +107,9 @@ struct thread {
 	int32_t recent_cpu;
 	/* Mon done. */
 
+	//project 2
+	uint64_t pml4; 
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
