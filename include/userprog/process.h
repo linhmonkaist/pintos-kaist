@@ -1,6 +1,11 @@
 #ifndef USERPROG_PROCESS_H
 #define USERPROG_PROCESS_H
 
+//add
+#define MAX_ARGUMENTS 32
+
+//end add
+
 #include "threads/thread.h"
 
 tid_t process_create_initd (const char *file_name);

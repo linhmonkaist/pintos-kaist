@@ -183,6 +183,9 @@ process_exec (void *f_name) {
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
+		//edit
+		thread_exit();
+		//end of edit
 		return -1;
 
 	/* Start switched process. */
@@ -421,51 +424,41 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	//place argument into stack
 	char *token, *save_ptr; 
-	int32_t counter = 0; 
-	int32_t arg_num = 0; 
-	int32_t i = 0; 
-	char *arr[20];
-	uintptr_t *arg_stack_add[20]; 
+	int32_t arg_count = 0; 
+	char **arr[MAX_ARGUMENTS];
+	uintptr_t *arg_address[MAX_ARGUMENTS]; 
 	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
-		if (strlen(token) % 4 == 0) counter += strlen(token) / 4;
-		else counter += strlen(token)/ 4 + 1; 
-		arr[i] = token; 
-		arg_num ++; 
+		arr[arg_count] = token; 
+		arg_count ++; 
 	}
-	uintptr_t *cur = if_ -> rsp + 4;
-	if_ -> rsp += counter * 4;
 
-	//Push the data of string argument 
-	i = arg_num - 1; //index of the last argument
-	for (uintptr_t *k = cur; k <= if_ -> rsp; k += 4){
-		*k = arr[i];
-		arg_stack_add[i] = k; 
-		int word_align = strlen(arr[i]) % 4 == 0 ? strlen(arr[i]) / 4 - 1 : strlen(arr[i]) / 4; 
-		for (int w = 0; w < word_align; w ++){
-			k += 4; 
-			*k = 0; 
+	for (int i= arg_count - 1; i > -1; i--){
+		if_ -> rsp --;
+		*(uint8_t *)if_ -> rsp = (uint8_t) 0; 
+		for (int c= strlen(arr[i]) - 1; c > -1; c--){
+			if_ -> rsp --; 
+			*(char *)if_ -> rsp = arr[i][c];
 		}
-		i--; 
+		arg_address[arg_count - 1- i] = if_ -> rsp;  
+	}
+	
+	while (if_ -> rsp % 8){
+		if_ -> rsp --; 
 	}
 
-	//Go to next area
-	if_ -> rsp += 4;
-	cur = if_ -> rsp; //save current pointer to word-align
-
-	//Add string separator
-	*(uintptr_t *)(if_ -> rsp) = 0; 
-
-	//Push the data of string address
-	i = arg_num - 1;
-	for (uintptr_t *k = cur; k <= cur + 4*arg_num; k += 4){
-		*k = arg_stack_add[i];
-		(if_ -> rsp) += 4; 
-		i--; 
+	for (int i = 0; i < arg_count; i++){
+		if_ -> rsp = sizeof(uint64_t);
+		*(uint64_t *) if_ -> rsp = arg_address[i]; 
 	}
 
+	if_ -> R.rdi = arg_count;
+	if_ -> R.rsi = if_ -> rsp;
+	if_ -> rsp = sizeof(uint64_t);
+	*(uint64_t *) if_ -> rsp = 0; 
 
-
-
+	//debug 
+	hex_dump(if_ -> rsp, if_ -> rsp, USER_STACK - if_ -> rsp, true); 
+	//end edit
 	success = true;
 
 done:
