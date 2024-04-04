@@ -60,6 +60,26 @@ process_create_initd (const char *file_name) {
 /* A thread function that launches first user process. */
 static void
 initd (void *f_name) {
+	//solution
+	struct thread *current = thread_current ();
+
+	/* STDIN */
+	struct filde *filde = (struct filde *) malloc (sizeof (struct filde));
+	*filde = (struct filde) {
+		.type = STDIN,
+		.fd = 0,
+	};
+	list_push_back (&current->fd_list, &filde->elem);
+
+	/* STDOUT */
+	filde = (struct filde *) malloc (sizeof (struct filde));
+	*filde = (struct filde) {
+		.type = STDOUT,
+		.fd = 1,
+	};
+
+	list_push_back (&current->fd_list, &filde->elem);
+	//end solution
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
@@ -182,11 +202,12 @@ process_exec (void *f_name) {
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
-	if (!success)
-		//edit
+	if (!success){
+		//solution
+		thread_current ()->exit_status = -1;
 		thread_exit();
 		//end of edit
-		return -1;
+	}
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -319,13 +340,58 @@ static bool validate_segment (const struct Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
+/*argument setup in stack*/
+static bool Mon_argument_stack(struct intr_frame *if_, char *file_name){
+	int MAX_ARGUMENTS = 64; 
+	char *token, *save_ptr; 
+	int arg_count = 0; 
+	char *arr[MAX_ARGUMENTS];
+	uintptr_t arg_address[MAX_ARGUMENTS]; 
+	char args_cpy[128];
+
+	memcpy(args_cpy, file_name, strlen(file_name) + 1); 
+	for (token = strtok_r(args_cpy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
+		arr[arg_count] = token; 
+		arg_count ++; 
+	}
+
+	for (int i= arg_count - 1; i > -1; i--){
+		for (int c= strlen(arr[i]); c > -1; c--){
+			if_ -> rsp --; 
+			*(uint8_t *)if_ -> rsp = arr[i][c];
+		}
+		arg_address[arg_count - 1- i] = if_ -> rsp;  
+	}
+	//padding
+	while ( if_ -> rsp & 7){
+		if_ -> rsp --; 
+		// *(uint8_t **) if_ -> rsp = 0;
+	}
+
+	if_ -> rsp -= sizeof(uint64_t);
+	*(uint64_t *) if_ -> rsp = (uint64_t) 0;
+
+	for (int i = 0; i < arg_count; i++){
+		if_ -> rsp -= sizeof(uint64_t);
+		* (uint64_t *) if_ -> rsp =  arg_address[i]; 
+	}
+
+	if_ -> R.rdi = arg_count;
+	if_ -> R.rsi = if_ -> rsp ; //????     _if.R.rsi = (char *)_if.rsp + 8;
+	// if_ -> rsp -= sizeof(uint64_t);
+	// *(uint64_t *) if_ -> rsp = (uint64_t) 0; 
+		if_ -> rsp -= sizeof(uint64_t);
+	*(uint64_t *) if_ -> rsp = (uint64_t) arg_count; 
+
+	return true; 
+}
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
  * Returns true if successful, false otherwise. */
 static bool
-load (const char *file_name, struct intr_frame *if_) {
+load ( char *file_name, struct intr_frame *if_) {
 	struct thread *t = thread_current ();
 	struct ELF ehdr;
 	struct file *file = NULL;
@@ -421,44 +487,9 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-
+	*(file_name + strlen(file_name)) = ' ';
+	Mon_argument_stack(if_, file_name);
 	//place argument into stack
-	char *token, *save_ptr; 
-	int32_t arg_count = 0; 
-	char **arr[MAX_ARGUMENTS];
-	uintptr_t *arg_address[MAX_ARGUMENTS]; 
-	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
-		arr[arg_count] = token; 
-		arg_count ++; 
-	}
-
-	for (int i= arg_count - 1; i > -1; i--){
-		if_ -> rsp --;
-		*(uint8_t *)if_ -> rsp = (uint8_t) 0; 
-		for (int c= strlen(arr[i]) - 1; c > -1; c--){
-			if_ -> rsp --; 
-			*(char *)if_ -> rsp = arr[i][c];
-		}
-		arg_address[arg_count - 1- i] = if_ -> rsp;  
-	}
-	
-	while (if_ -> rsp % 8){
-		if_ -> rsp --; 
-	}
-
-	for (int i = 0; i < arg_count; i++){
-		if_ -> rsp = sizeof(uint64_t);
-		*(uint64_t *) if_ -> rsp = arg_address[i]; 
-	}
-
-	if_ -> R.rdi = arg_count;
-	if_ -> R.rsi = if_ -> rsp;
-	if_ -> rsp = sizeof(uint64_t);
-	*(uint64_t *) if_ -> rsp = 0; 
-
-	//debug 
-	hex_dump(if_ -> rsp, if_ -> rsp, USER_STACK - if_ -> rsp, true); 
-	//end edit
 	success = true;
 
 done:

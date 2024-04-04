@@ -140,6 +140,13 @@ page_fault (struct intr_frame *f) {
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
+	//solution
+	struct thread *t = thread_current();
+	if (user == true){
+		t -> exit_status = -1;
+		thread_exit(); 
+	}
+
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
