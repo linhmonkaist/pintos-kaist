@@ -288,6 +288,10 @@ thread_create (const char *name, int priority, thread_func *function, void *aux)
 		t->nice = th_cur ->nice;
 		helper_priority (t);
 	}
+#ifdef USERPROG
+	list_push_back (&(thread_current ()->childs), &t->child_elem);
+
+#endif
 	/* Mon done. */
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -549,6 +553,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 		list_init (&t->childs);
 		list_init (&t->fd_list);
 		lock_init (&t->child_lock);
+		sema_init (&t->wait_sema, 0);
+		sema_init (&t->cleanup_ok, 0);
 	#endif	
 	//end solution
 }

@@ -1,0 +1,125 @@
+Kernel command line: -q -f put multi-oom run multi-oom
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  183,296,000 loops/s.
+hd0:0: detected 337 sector (168 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 107 sector (53 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'multi-oom' into the file system...
+Executing 'multi-oom':
+(multi-oom) begin
+child_6_X: exit(-1)
+child_7_X: exit(-1)
+child_8_X: exit(-1)
+child_9_X: exit(-1)
+child_10_X: exit(-1)
+child_11_X: exit(-1)
+child_12_X: exit(-1)
+child_13_X: exit(-1)
+child_14_X: exit(-1)
+child_15_X: exit(-1)
+child_16_X: exit(-1)
+child_17_X: exit(-1)
+child_18_X: exit(-1)
+child_19_X: exit(-1)
+child_20_X: exit(-1)
+child_21_X: exit(-1)
+child_22_X: exit(-1)
+child_23_X: exit(-1)
+child_24_X: exit(-1)
+child_25_X: exit(-1)
+child_26_X: exit(-1)
+child_27_X: exit(-1)
+child_28_X: exit(-1)
+child_29_X: exit(-1)
+child_30_X: exit(-1)
+child_31_X: exit(-1)
+child_32_X: exit(-1)
+child_33_X: exit(-1)
+child_32_O: exit(33)
+child_31_O: exit(33)
+child_30_O: exit(33)
+child_29_O: exit(33)
+child_28_O: exit(33)
+child_27_O: exit(33)
+child_26_O: exit(33)
+child_25_O: exit(33)
+child_24_O: exit(33)
+child_23_O: exit(33)
+child_22_O: exit(33)
+child_21_O: exit(33)
+child_20_O: exit(33)
+child_19_O: exit(33)
+child_18_O: exit(33)
+child_17_O: exit(33)
+child_16_O: exit(33)
+child_15_O: exit(33)
+child_14_O: exit(33)
+child_13_O: exit(33)
+child_12_O: exit(33)
+child_11_O: exit(33)
+child_10_O: exit(33)
+child_9_O: exit(33)
+child_8_O: exit(33)
+child_7_O: exit(33)
+child_6_O: exit(33)
+child_5_O: exit(33)
+child_4_O: exit(33)
+child_3_O: exit(33)
+child_2_O: exit(33)
+child_1_O: exit(33)
+child_0_O: exit(33)
+(multi-oom) Spawned at least 10 children.
+child_6_X: exit(-1)
+child_7_X: exit(-1)
+child_8_X: exit(-1)
+child_9_X: exit(-1)
+child_10_X: exit(-1)
+child_11_X: exit(-1)
+child_12_X: exit(-1)
+child_13_X: exit(-1)
+child_14_X: exit(-1)
+child_15_X: exit(-1)
+child_16_X: exit(-1)
+child_17_X: exit(-1)
+child_18_X: exit(-1)
+child_19_X: exit(-1)
+child_20_X: exit(-1)
+child_21_X: exit(-1)
+child_22_X: exit(-1)
+child_23_X: exit(-1)
+child_24_X: exit(-1)
+child_25_X: exit(-1)
+child_26_X: exit(-1)
+child_27_X: exit(-1)
+Interrupt 0x0d (#GP General Protection Exception) at rip=8004219244
+ cr2=0000008004000000 error=               0
+rax cccccccccccccccc rbx 000000000000001c rcx 000000000000000b rdx cccccccccccccccc
+rsp 000000800498de80 rbp 000000800498de90 rsi 000000000000098b rdi 00000080049f90e8
+rip 0000008004219244 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
+r11 0000000000000206 r12 000000800421f6da r13 0000800420830400 r14 00008004244ef000
+r15 0000000420756400 rflags 00000202
+es: 001b ds: 001b cs: 0008 ss: 0010
+Kernel PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x80042189df 0x800421e08a 0x8004209191 0x80042095af 0x800421929a 0x800421ced7 0x80042076b7 0x800421f747 0x800421e2ae 0x400395 0x4004b1 0x400fb0 0Page fault at 0x10000000000: not present error reading page in kernel context.
+Interrupt 0x0e (#PF Page-Fault Exception) at rip=8004215a19
+ cr2=0000010000000000 error=               0
+rax 0000010000000000 rbx 000000000000001c rcx 00000080040b8000 rdx 00000000000003d4
+rsp 000000800498dcc0 rbp 000000800498dcd0 rsi 000000000000cd0f rdi 0000000000000000
+rip 0000008004215a19 r8 000000800498dbd8  r9 000000800421be58 r10 0000000000000000
+r11 0000000000000206 r12 000000800421f6da r13 0000800420830400 r14 00008004244ef000
+r15 0000000420756400 rflags 00000006
+es: 0010 ds: 0010 cs: 0008 ss: 0010
+Kernel PANIC recursion at ../../userprog/exception.c:97 in kill().
+Timer: 3961 ticks
+Thread: 271 idle ticks, 67 kernel ticks, 3623 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 28055 reads, 242 writes
+hd1:0: 107 reads, 0 writes
+Console: 3984 characters output
+Key

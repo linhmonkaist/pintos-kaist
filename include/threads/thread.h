@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 #include "threads/interrupt.h"
 #include "threads/fixed-point.h"
 #ifdef VM
@@ -87,13 +88,14 @@ typedef int tid_t;
  * ready state is on the run queue, whereas only a thread in the
  * blocked state is on a semaphore wait list. */
 //solution
+enum FILETYPE { STDIN, STDOUT, FILE }; 
 struct file_obj {
 	struct file *file;
 	int ref_cnt;
 };
 
 struct filde {
-	enum { STDIN, STDOUT, FILE } type;
+	enum FILETYPE type;
 	int fd;
 	struct list_elem elem;
 	struct file_obj *obj;
@@ -138,9 +140,10 @@ struct thread {
 	//Done solution
 	struct intr_frame parent_if;
 	struct list child_list;
-	struct list_elem child_elem;
 
 	struct semaphore load_sema;
+	bool fork_succeed;
+	struct semaphore fork_sema;
 
 #endif
 #ifdef VM
