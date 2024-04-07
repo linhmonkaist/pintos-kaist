@@ -279,6 +279,7 @@ thread_create (const char *name, int priority,
 
 #ifdef USERPROG
 	list_push_back (&(thread_current ()->childs), &t->child_elem);
+
 #endif
 
 	/* Add to run queue. */
@@ -515,11 +516,29 @@ init_thread (struct thread *t, const char *name, int priority) {
 #ifdef USERPROG
 	list_init (&t->childs);
 	list_init (&t->fd_list);
-	lock_init (&t->child_lock);
+
+	//Viera Add
+	/* STDIN */
+	// struct filde *filde = (struct filde *) malloc (sizeof (struct filde));
+	// *filde = (struct filde) {
+	// 	.type = STDIN,
+	// 	.fd = 0,
+	// };
+	// list_push_back (&t->fd_list, &filde->elem);
+
+	// /* STDOUT */
+	// filde = (struct filde *) malloc (sizeof (struct filde));
+	// *filde = (struct filde) {
+	// 	.type = STDOUT,
+	// 	.fd = 1,
+	// };
+
+	// list_push_back (&t->fd_list, &filde->elem);
 
 	//Viera Add
 	sema_init (&t->wait_sema, 0);
 	sema_init (&t->cleanup_ok, 0);
+	lock_init (&t->child_lock);
 #endif
 }
 

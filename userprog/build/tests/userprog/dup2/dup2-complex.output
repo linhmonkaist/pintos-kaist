@@ -21,8 +21,8 @@ child: exit(110)
 (dup2-complex) Parent success
 dup2-complex: exit(0)
 Execution of 'dup2-complex' complete.
-Timer: 86 ticks
-Thread: 33 idle ticks, 48 kernel ticks, 5 user ticks
+Timer: 88 ticks
+Thread: 30 idle ticks, 52 kernel ticks, 6 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 207 reads, 321 writes
 hd1:0: 125 reads, 0 writes

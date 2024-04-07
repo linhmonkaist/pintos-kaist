@@ -292,6 +292,11 @@ static struct file_obj *fd_map_lookup(struct fd_map *fd_map, struct file_obj *f)
     return NULL; // Could log that no matching entry was found
 }
 
+static void free_map(struct fd_map *map){
+	free(map -> entries);
+	free(map);
+}
+
 // static struct file_obj *
 // fd_map_lookup (struct fd_map *fd_map, struct file_obj *f) {
 // 	for (int index = 0; index < fd_map->i; index++) {
@@ -414,34 +419,40 @@ __do_fork (void *aux_) {
 	for (e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e)) {
 		filde = list_entry (e, struct filde, elem);
 		struct filde *nfilde = (struct filde *) malloc (sizeof (struct filde));
-		if (!nfilde)
-			goto out;
+		if (!nfilde){
+			free_map(map);
+			goto out_no_free; 
+		}
 
 		*nfilde = *filde;
-
-		if (filde->type == FILE) {
-			nfile_obj = fd_map_lookup (map, filde->obj);
-			if (!nfile_obj) {
-				nfile_obj = (struct file_obj *) malloc (sizeof (struct file_obj));
-				if (!nfile_obj) {
-					free(nfilde);
-					goto out;
-					// nfile_obj->file = file_duplicate (filde->obj->file);
-					// nfile_obj->ref_cnt = 0;
-					// fd_map_add (map, filde->obj, nfile_obj);
-				}
-				nfile_obj->file = file_duplicate (filde->obj->file);
-				nfile_obj->ref_cnt = 0;
-				
-				if(!fd_map_add (map, filde->obj, nfile_obj)) {
-					free(nfile_obj); //Viera Add
-					free (nfilde);
-					goto out;
-				}
-			}
+		if (filde -> type != FILE){
+			list_push_back (&current->fd_list, &nfilde->elem);
+			continue;
+		}
+		nfile_obj = fd_map_lookup (map, filde->obj);
+		if (nfile_obj){
 			nfile_obj->ref_cnt++;
 			nfilde->obj = nfile_obj;
+			list_push_back (&current->fd_list, &nfilde->elem);
+			continue;
 		}
+		nfile_obj = (struct file_obj *) malloc (sizeof (struct file_obj));
+		if (!nfile_obj) {
+			free(nfilde);
+			free_map(map);
+			goto out_no_free; 
+		}
+		nfile_obj->file = file_duplicate (filde->obj->file);
+		nfile_obj->ref_cnt = 0;
+		
+		if(!fd_map_add (map, filde->obj, nfile_obj)) {
+			free(nfile_obj); //Viera Add
+			free (nfilde);
+			free_map(map);
+			goto out_no_free; 
+		}
+		nfile_obj->ref_cnt++;
+		nfilde->obj = nfile_obj;
 		list_push_back (&current->fd_list, &nfilde->elem);
 	}
 
@@ -453,9 +464,7 @@ __do_fork (void *aux_) {
 
 	// duplicate_fds(parent, current); //Viera Add
 	succ = true;
-out:
-	free(map->entries); //Viera Add
-	free (map);
+
 out_no_free:
 	// parent->fork_succeed = succ; //struct thread *parent = aux->parent;
 	aux->status.succ = succ;
@@ -511,13 +520,13 @@ process_exec (void *f_name) {
 static struct thread* 
 get_child_tid (tid_t child_tid) {
   struct list *children = &(thread_current ()->childs);
-  struct list_elem *e;
+  struct list_elem *e = list_begin (children);
 
-  for (e = list_begin (children); e != list_end (children); 
-       e = list_next (e)) {
+  while (e != list_end (children)) {
     struct thread *child_th = list_entry (e, struct thread, child_elem);
     if (child_th->tid == child_tid)
       return child_th;
+	e = list_next (e);
   }
 
   return NULL;
@@ -771,6 +780,8 @@ load (char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+	file_deny_write (file);
+	t->executable = file;
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -855,10 +866,14 @@ load (char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	if (success) {
-		file_deny_write (file);
-		t->executable = file;
-	} else {
+	// if (success) {
+	// 	file_deny_write (file);
+	// 	t->executable = file;
+	// } else {
+	// 	file_close (file);
+	// 	t->executable = NULL;
+	// }
+	if (!success) {
 		file_close (file);
 		t->executable = NULL;
 	}
