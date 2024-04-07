@@ -1,0 +1,92 @@
+Kernel command line: -q -f put multi-oom run multi-oom
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  157,081,600 loops/s.
+hd0:0: detected 329 sector (164 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 108 sector (54 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'multi-oom' into the file system...
+Executing 'multi-oom':
+(multi-oom) begin
+child_6_X: exit(-1)
+child_7_X: exit(-1)
+child_8_X: exit(-1)
+child_9_X: exit(-1)
+child_10_X: exit(-1)
+child_11_X: exit(-1)
+child_12_X: exit(-1)
+child_13_X: exit(-1)
+child_14_X: exit(-1)
+child_15_X: exit(-1)
+child_16_X: exit(-1)
+child_17_X: exit(-1)
+child_18_X: exit(-1)
+child_19_X: exit(-1)
+child_20_X: exit(-1)
+child_21_X: exit(-1)
+child_22_X: exit(-1)
+child_23_X: exit(-1)
+child_24_X: exit(-1)
+child_25_X: exit(-1)
+child_26_X: exit(-1)
+child_27_X: exit(-1)
+child_28_X: exit(-1)
+child_29_X: exit(-1)
+child_30_X: exit(-1)
+child_31_X: exit(-1)
+child_32_X: exit(-1)
+child_33_X: exit(-1)
+child_34_X: exit(-1)
+child_35_X: exit(-1)
+child_36_X: exit(-1)
+child_37_X: exit(-1)
+child_38_X: exit(-1)
+child_39_X: exit(-1)
+child_40_X: exit(-1)
+child_41_X: exit(-1)
+child_42_X: exit(-1)
+child_43_X: exit(-1)
+child_44_X: exit(-1)
+child_45_X: exit(-1)
+child_46_X: exit(-1)
+child_47_X: exit(-1)
+child_48_X: exit(-1)
+child_49_X: exit(-1)
+child_50_X: exit(-1)
+child_51_X: exit(-1)
+child_52_X: exit(-1)
+child_53_X: exit(-1)
+child_54_X: exit(-1)
+child_55_X: exit(-1)
+child_56_X: exit(-1)
+child_57_X: exit(-1)
+Interrupt 0x0d (#GP General Protection Exception) at rip=8004218c08
+ cr2=0000000000000000 error=               0
+rax cccccccccccccccc rbx 000000000000003a rcx 0000000000000020 rdx cccccccccccccccc
+rsp 00000080049a2e80 rbp 00000080049a2e90 rsi 00000000000009a0 rdi 00000080049de0f8
+rip 0000008004218c08 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
+r11 0000000000000206 r12 000000800421e90b r13 0000000420748700 r14 00008004242f0000
+r15 0000800420819100 rflags 00000202
+es: 001b ds: 001b cs: 0008 ss: 0010
+Kernel PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x80042183a3 0x800421d696 0x8004208feb 0x8004209409 0x8004218c5e 0x800421c68f 0x80042075da 0x800421e978 0x800421d8b2 0x400400 0x4004b6 0x40101b 0Interrupt 0x0d (#GP General Protection Exception) at rip=80042153dd
+ cr2=0000000000000000 error=               0
+rax 0000800424102800 rbx 000000000000003a rcx 00000080040b8000 rdx 00000000000003d4
+rsp 00000080049a2cc0 rbp 00000080049a2cd0 rsi 000000000000cd0f rdi 0000000000000000
+rip 00000080042153dd r8 00000080049a2bd8  r9 000000800421b81c r10 0000000000000000
+r11 0000000000000206 r12 000000800421e90b r13 0000000420748700 r14 00008004242f0000
+r15 0000800420819100 rflags 00000006
+es: 0010 ds: 0010 cs: 0008 ss: 0010
+Kernel PANIC recursion at ../../userprog/exception.c:97 in kill().
+Timer: 2346 ticks
+Thread: 183 idle ticks, 80 kernel ticks, 2083 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 13301 reads, 244 writes
+hd1:0: 108 reads, 0 writes
+Console: 3234 characters output
+Key
