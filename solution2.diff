@@ -1,0 +1,1693 @@
+diff --git a/devices/timer.c b/devices/timer.c
+index 796f5a8..fb03503 100644
+--- a/devices/timer.c
++++ b/devices/timer.c
+@@ -87,14 +87,31 @@ timer_elapsed (int64_t then) {
+ 	return timer_ticks () - then;
+ }
+ 
++static bool compare_tick (const struct list_elem *A,
++		const struct list_elem *B, void *aux UNUSED) {
++	const struct thread *threadA = list_entry (A, struct thread, elem);
++	const struct thread *threadB = list_entry (B, struct thread, elem);
++	return threadA->ticks < threadB->ticks;
++}
++
+ /* Suspends execution for approximately TICKS timer ticks. */
+ void
+ timer_sleep (int64_t ticks) {
+ 	int64_t start = timer_ticks ();
+ 
+ 	ASSERT (intr_get_level () == INTR_ON);
++	/*
+ 	while (timer_elapsed (start) < ticks)
+ 		thread_yield ();
++	*/
++	/* Solution */
++	struct thread *th = thread_current ();
++	enum intr_level old_level = intr_disable ();
++	th->ticks = ticks + start;
++	list_insert_ordered (&block_list, &th->elem, compare_tick, NULL);
++	thread_block ();
++	intr_set_level(old_level);
++
+ }
+ 
+ /* Suspends execution for approximately MS milliseconds. */
+@@ -126,6 +143,18 @@ static void
+ timer_interrupt (struct intr_frame *args UNUSED) {
+ 	ticks++;
+ 	thread_tick ();
++
++	/* Solution */
++	struct thread *th;
++
++	while (!list_empty (&block_list)) {
++		th = list_entry (list_front (&block_list), struct thread, elem);
++		if (ticks >= th->ticks) {
++			list_pop_front (&block_list);
++			thread_unblock (th);
++		} else
++			break;
++	}
+ }
+ 
+ /* Returns true if LOOPS iterations waits for more than one timer
+diff --git a/include/threads/fixed-point.h b/include/threads/fixed-point.h
+new file mode 100644
+index 0000000..3e1acf5
+--- /dev/null
++++ b/include/threads/fixed-point.h
+@@ -0,0 +1,10 @@
++#ifndef FIXED_POINT_H
++#define FIXED_POINT_H
++#define fp_fr 14
++#define fp_f (1 << 14)
++#define FP(x) ((x) << 14)
++#define FP2INT(x) ((x) >> 14)
++#define MUL(x, y) (((int64_t)(x)) * (y) / (fp_f))
++#define DIV(x, y) (((int64_t)(x)) * (fp_f) / (y))
++typedef int32_t FP;
++#endif
+diff --git a/include/threads/synch.h b/include/threads/synch.h
+index 3d089fd..60a92ac 100644
+--- a/include/threads/synch.h
++++ b/include/threads/synch.h
+@@ -18,6 +18,10 @@ void sema_self_test (void);
+ 
+ /* Lock. */
+ struct lock {
++	/* Solutions */
++	struct list_elem elem;
++	struct list waiters;
++	/* Solutions done. */
+ 	struct thread *holder;      /* Thread holding lock (for debugging). */
+ 	struct semaphore semaphore; /* Binary semaphore controlling access. */
+ };
+diff --git a/include/threads/thread.h b/include/threads/thread.h
+index 33b46e6..66d63cc 100644
+--- a/include/threads/thread.h
++++ b/include/threads/thread.h
+@@ -4,7 +4,9 @@
+ #include <debug.h>
+ #include <list.h>
+ #include <stdint.h>
++#include "threads/synch.h"
+ #include "threads/interrupt.h"
++#include "threads/fixed-point.h"
+ #ifdef VM
+ #include "vm/vm.h"
+ #endif
+@@ -28,6 +30,18 @@ typedef int tid_t;
+ #define PRI_DEFAULT 31                  /* Default priority. */
+ #define PRI_MAX 63                      /* Highest priority. */
+ 
++struct file_obj {
++	struct file *file;
++	int ref_cnt;
++};
++
++struct filde {
++	enum { STDIN, STDOUT, FILE } type;
++	int fd;
++	struct list_elem elem;
++	struct file_obj *obj;
++};
++
+ /* A kernel thread or user process.
+  *
+  * Each thread structure is stored in its own 4 kB page.  The
+@@ -95,9 +109,32 @@ struct thread {
+ 	/* Shared between thread.c and synch.c. */
+ 	struct list_elem elem;              /* List element. */
+ 
++	/* Solution */
++	int64_t ticks;                      /* Saved ticks */
++	int effective_priority;             /* Effective Priority */
++	struct list_elem lock_elem;         /* for waiters in struct lock */
++	struct list locks;                  /* List of locks thread hold */
++
++	struct lock *waiting_lock;
++	struct thread *donator;
++	struct thread *donatee;
++	int nice;
++	FP recent_cpu;
++	/* Solution done. */
++
+ #ifdef USERPROG
+ 	/* Owned by userprog/process.c. */
+ 	uint64_t *pml4;                     /* Page map level 4 */
++	struct file *executable;
++	int exit_status;
++	struct semaphore wait_sema;
++	struct semaphore cleanup_ok;
++	struct list_elem child_elem;
++	struct list childs;
++	struct lock child_lock;
++
++	struct list fd_list;
++	bool wait_on_exit;
+ #endif
+ #ifdef VM
+ 	/* Table for whole virtual memory owned by thread. */
+@@ -114,6 +151,13 @@ struct thread {
+    Controlled by kernel command-line option "-o mlfqs". */
+ extern bool thread_mlfqs;
+ 
++/* Solution */
++struct list block_list;
++bool compare_priority (const struct list_elem *A,
++		const struct list_elem *B, void *aux UNUSED);
++
++/* Solution done. */
++
+ void thread_init (void);
+ void thread_start (void);
+ 
+diff --git a/include/userprog/syscall.h b/include/userprog/syscall.h
+index 9059096..6d4c0d4 100644
+--- a/include/userprog/syscall.h
++++ b/include/userprog/syscall.h
+@@ -1,6 +1,9 @@
+ #ifndef USERPROG_SYSCALL_H
+ #define USERPROG_SYSCALL_H
++#include <stdint.h>
++#include "threads/thread.h"
+ 
+ void syscall_init (void);
++bool clean_filde (struct filde *filde);
+ 
+ #endif /* userprog/syscall.h */
+diff --git a/threads/synch.c b/threads/synch.c
+index 8ca3230..7f13cb8 100644
+--- a/threads/synch.c
++++ b/threads/synch.c
+@@ -109,10 +109,26 @@ sema_up (struct semaphore *sema) {
+ 	ASSERT (sema != NULL);
+ 
+ 	old_level = intr_disable ();
++	/*
+ 	if (!list_empty (&sema->waiters))
+ 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
+ 					struct thread, elem));
++	*/
++	/* Solution */
++	struct thread *th = NULL;
++	if (!list_empty (&sema->waiters)) {
++		struct list_elem *elem =
++			list_max (&sema->waiters, compare_priority, NULL);
++		th = list_entry(elem, struct thread, elem);
++		list_remove (elem);
++		thread_unblock (th);
++	}
++	/* Solution done. */
+ 	sema->value++;
++	if (!intr_context () && th &&
++			th->effective_priority > thread_current ()->effective_priority)
++		thread_yield();
++
+ 	intr_set_level (old_level);
+ }
+ 
+@@ -150,7 +166,7 @@ sema_test_helper (void *sema_) {
+ 		sema_up (&sema[1]);
+ 	}
+ }
+-
++
+ /* Initializes LOCK.  A lock can be held by at most a single
+    thread at any given time.  Our locks are not "recursive", that
+    is, it is an error for the thread currently holding a lock to
+@@ -170,10 +186,60 @@ void
+ lock_init (struct lock *lock) {
+ 	ASSERT (lock != NULL);
+ 
++	/* Solution */
++	list_init (&lock->waiters);
++	/* Solution done. */
++
+ 	lock->holder = NULL;
+ 	sema_init (&lock->semaphore, 1);
+ }
+ 
++/* Solution */
++/* Compare Priority of Threads */
++static bool
++compare_priority_in_lock (const struct list_elem *A,
++		const struct list_elem *B, void *aux UNUSED) {
++    const struct thread *threadA = list_entry (A, struct thread, lock_elem);
++    const struct thread *threadB = list_entry (B, struct thread, lock_elem);
++    return threadA->effective_priority < threadB->effective_priority;
++}
++
++/* get maximum priority between holding locks' waiters */
++static bool
++compare_priority_in_locks (const struct list_elem *A,
++		const struct list_elem *B, void *aux UNUSED) {
++	struct lock *lockA = list_entry (A, struct lock, elem);
++	struct lock *lockB = list_entry (B, struct lock, elem);
++
++	struct thread *priorityA = list_entry (list_max (&lockA->waiters, compare_priority_in_lock, NULL), struct thread, lock_elem);
++	struct thread *priorityB = list_entry (list_max (&lockB->waiters, compare_priority_in_lock, NULL), struct thread, lock_elem);
++    return priorityA < priorityB;
++}
++
++/* donate priority to holder to max priority of waiters */
++static void
++donate_effective_priority (struct thread *holder) {
++	holder->effective_priority = holder->priority;
++	if (!list_empty (&holder->locks)) {
++		struct lock *l = list_entry (
++				list_max (&holder->locks, compare_priority_in_locks, NULL),
++				struct lock, elem);
++		if (list_empty(&l->waiters))
++			return;
++		struct thread *t = list_entry (
++				list_max (&l->waiters, compare_priority_in_lock, NULL),
++				struct thread, lock_elem);
++
++		if (t && t->effective_priority > holder->effective_priority) {
++			holder->effective_priority = t->effective_priority;
++			struct lock *l = holder->waiting_lock;
++			if (l && l->holder)
++				donate_effective_priority (l->holder);
++		}
++	}
++}
++/* Solution done. */
++
+ /* Acquires LOCK, sleeping until it becomes available if
+    necessary.  The lock must not already be held by the current
+    thread.
+@@ -188,8 +254,36 @@ lock_acquire (struct lock *lock) {
+ 	ASSERT (!intr_context ());
+ 	ASSERT (!lock_held_by_current_thread (lock));
+ 
++	/*
+ 	sema_down (&lock->semaphore);
+ 	lock->holder = thread_current ();
++	*/
++
++	/* Solution */
++	struct thread *cur = thread_current ();
++	struct thread *holder = lock->holder;
++	if(thread_mlfqs) {
++		sema_down (&lock->semaphore);
++		lock->holder = cur;
++		return;
++	}
++
++	if (holder) {
++		/* insert current thread into lock */
++		list_push_back (&lock->waiters, &cur->lock_elem);
++		cur->waiting_lock = lock;
++		donate_effective_priority (holder);
++	}
++	sema_down (&lock->semaphore);
++
++	/* remove current thread from waiting list */
++	if (holder)
++		list_remove (&cur->lock_elem);
++	cur->waiting_lock = NULL;
++	/* insert current lock into holding locks list */
++	list_push_back (&cur->locks, &lock->elem);
++	lock->holder = cur;
++	/* Solution done. */
+ }
+ 
+ /* Tries to acquires LOCK and returns true if successful or false
+@@ -222,7 +316,18 @@ lock_release (struct lock *lock) {
+ 	ASSERT (lock != NULL);
+ 	ASSERT (lock_held_by_current_thread (lock));
+ 
++	//lock->holder = NULL;
++	/* Solution */
++	if(thread_mlfqs) {
++		lock->holder = NULL;
++		sema_up (&lock->semaphore);
++		return;
++	}
++	struct thread *holder = lock->holder;
++	list_remove (&lock->elem);      /* remove lock from holding list */
+ 	lock->holder = NULL;
++	donate_effective_priority (holder); /* recalculate priority */
++	/* Solution done. */
+ 	sema_up (&lock->semaphore);
+ }
+ 
+@@ -288,6 +393,28 @@ cond_wait (struct condition *cond, struct lock *lock) {
+ 	lock_acquire (lock);
+ }
+ 
++/* Solution */
++/* get semaphore which has maximum eff_priority */
++static bool
++compare_priority_cond (const struct list_elem *A,
++		const struct list_elem *B, void *aux UNUSED) {
++	struct semaphore *semaphoreA =
++		&list_entry (A, struct semaphore_elem, elem)->semaphore;
++	struct semaphore *semaphoreB =
++		&list_entry (B, struct semaphore_elem, elem)->semaphore;
++	const struct thread *threadA;
++	const struct thread *threadB;
++
++	threadA = list_entry (
++			list_max (&semaphoreA->waiters, compare_priority, NULL),
++			struct thread, elem);
++	threadB = list_entry (
++			list_max (&semaphoreB->waiters, compare_priority, NULL),
++			struct thread, elem);
++	return threadA->priority < threadB->priority;
++}
++/* Solution done. */
++
+ /* If any threads are waiting on COND (protected by LOCK), then
+    this function signals one of them to wake up from its wait.
+    LOCK must be held before calling this function.
+@@ -302,9 +429,23 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
+ 	ASSERT (!intr_context ());
+ 	ASSERT (lock_held_by_current_thread (lock));
+ 
++	/*
+ 	if (!list_empty (&cond->waiters))
+ 		sema_up (&list_entry (list_pop_front (&cond->waiters),
+ 					struct semaphore_elem, elem)->semaphore);
++	*/
++	/* Solution */
++	struct list_elem *elem;
++	struct semaphore *sema;
++	if (!list_empty (&cond->waiters)) {
++		/* sema_up according to comp_priority_cond */
++		elem = list_max (&cond->waiters, compare_priority_cond, NULL);
++		sema = &list_entry (elem, struct semaphore_elem, elem)->semaphore;
++
++		list_remove (elem);
++		sema_up (sema);
++	}
++	/* Solution done. */
+ }
+ 
+ /* Wakes up all threads, if any, waiting on COND (protected by
+diff --git a/threads/thread.c b/threads/thread.c
+index bc9e260..2471eef 100644
+--- a/threads/thread.c
++++ b/threads/thread.c
+@@ -10,6 +10,7 @@
+ #include "threads/palloc.h"
+ #include "threads/synch.h"
+ #include "threads/vaddr.h"
++#include "devices/timer.h"
+ #include "intrinsic.h"
+ #ifdef USERPROG
+ #include "userprog/process.h"
+@@ -40,6 +41,11 @@ static struct lock tid_lock;
+ /* Thread destruction requests */
+ static struct list destruction_req;
+ 
++/* Solution */
++/* List of blocked processes */
++struct list block_list;
++FP load_avg;
++
+ /* Statistics. */
+ static long long idle_ticks;    /* # of timer ticks spent idle. */
+ static long long kernel_ticks;  /* # of timer ticks in kernel threads. */
+@@ -109,6 +115,11 @@ thread_init (void) {
+ 	lock_init (&tid_lock);
+ 	list_init (&ready_list);
+ 	list_init (&destruction_req);
++	/* Solution */
++	list_init (&block_list);
++	if (thread_mlfqs)
++		load_avg = 0;
++	/* Solution done. */
+ 
+ 	/* Set up a thread structure for the running thread. */
+ 	initial_thread = running_thread ();
+@@ -133,6 +144,43 @@ thread_start (void) {
+ 	sema_down (&idle_started);
+ }
+ 
++/* Solution */
++static void
++thread_for_each (void (*action)(struct thread *)) {
++	struct list_elem *e;
++	 for (e = list_begin (&ready_list); e != list_end (&ready_list);
++			 e = list_next (e)) {
++		 struct thread *t = list_entry (e, struct thread, elem);
++		 action (t);
++	 }
++	 for (e = list_begin (&block_list); e != list_end (&block_list);
++			 e = list_next (e)) {
++		 struct thread *t = list_entry (e, struct thread, elem);
++		 action (t);
++	 }
++	 if (thread_current () != idle_thread) {
++		 action (thread_current ());
++	 }
++}
++
++static void
++calc_recent_cpu (struct thread *t) {
++	t->recent_cpu = DIV (MUL (MUL (FP (2), load_avg), t->recent_cpu),
++			MUL (FP (2), load_avg) + FP (1)) + FP (t->nice);
++}
++
++static void
++calc_priority (struct thread *t) {
++	t->priority = PRI_MAX - FP2INT (DIV (t->recent_cpu, FP (4))) - 2 * t->nice;
++	if (t->priority > PRI_MAX)
++		t->priority = PRI_MAX;
++	else if (t->priority < PRI_MIN)
++		t->priority = PRI_MIN;
++
++	t->effective_priority = t->priority;
++}
++/* Solution done. */
++
+ /* Called by the timer interrupt handler at each timer tick.
+    Thus, this function runs in an external interrupt context. */
+ void
+@@ -148,6 +196,25 @@ thread_tick (void) {
+ #endif
+ 	else
+ 		kernel_ticks++;
++	/* Solution */
++	if (thread_mlfqs) {
++		uint64_t rthreads = list_size(&ready_list) + (t != idle_thread);
++		/* update load_avg and update recent_cpu of all threads per 1s. */
++		if (timer_ticks () % TIMER_FREQ == 0) {
++			load_avg = DIV (MUL (FP (59), load_avg), FP (60)) +
++				DIV (FP (rthreads), FP (60));
++			thread_for_each (calc_recent_cpu);
++		}
++		/* if current thread is not idle thread add 1 to recent_cpu */
++		if (t != idle_thread) {
++			t->recent_cpu += FP (1);
++		}
++		/* every 4 ticks, update priority of all threads. */
++		if (timer_ticks() % 4 == 3) {
++			 thread_for_each (calc_priority);
++		}
++	}
++	/* Solution done. */
+ 
+ 	/* Enforce preemption. */
+ 	if (++thread_ticks >= TIME_SLICE)
+@@ -203,10 +270,21 @@ thread_create (const char *name, int priority,
+ 	t->tf.ss = SEL_KDSEG;
+ 	t->tf.cs = SEL_KCSEG;
+ 	t->tf.eflags = FLAG_IF;
+-
++	/* Solution */
++	if (thread_mlfqs) {
++		t->recent_cpu = thread_current ()->recent_cpu;
++		t->nice = thread_current ()->nice;
++		calc_priority (t);
++	}
+ 	/* Add to run queue. */
+ 	thread_unblock (t);
+ 
++	/* Solution */
++	if (thread_current()->effective_priority < t->effective_priority) {
++		thread_yield ();
++	}
++	/* Solution done. */
++
+ 	return tid;
+ }
+ 
+@@ -220,8 +298,7 @@ void
+ thread_block (void) {
+ 	ASSERT (!intr_context ());
+ 	ASSERT (intr_get_level () == INTR_OFF);
+-	thread_current ()->status = THREAD_BLOCKED;
+-	schedule ();
++	do_schedule (THREAD_BLOCKED);
+ }
+ 
+ /* Transitions a blocked thread T to the ready-to-run state.
+@@ -311,40 +388,56 @@ thread_yield (void) {
+ /* Sets the current thread's priority to NEW_PRIORITY. */
+ void
+ thread_set_priority (int new_priority) {
+-	thread_current ()->priority = new_priority;
++	//thread_current ()->priority = new_priority;
++	/* Solution */
++	struct thread *current = thread_current ();
++	current->priority = new_priority;
++	if (list_empty (&current->locks))
++		current->effective_priority = new_priority;
++	thread_yield ();
+ }
+ 
+ /* Returns the current thread's priority. */
+ int
+ thread_get_priority (void) {
+-	return thread_current ()->priority;
++	return thread_current ()->effective_priority;
+ }
+ 
+ /* Sets the current thread's nice value to NICE. */
+ void
+ thread_set_nice (int nice UNUSED) {
+ 	/* TODO: Your implementation goes here */
++	/* Solution */
++	thread_current ()->nice = nice;
++	calc_priority (thread_current ());
++	/* Solution done. */
+ }
+ 
+ /* Returns the current thread's nice value. */
+ int
+ thread_get_nice (void) {
+ 	/* TODO: Your implementation goes here */
+-	return 0;
++	/* Solution */
++	return thread_current ()->nice;
++	/* Solution done. */
+ }
+ 
+ /* Returns 100 times the system load average. */
+ int
+ thread_get_load_avg (void) {
+ 	/* TODO: Your implementation goes here */
+-	return 0;
++	/* Solution */
++	return FP2INT (MUL (FP (100), load_avg));
++	/* Solution done. */
+ }
+ 
+ /* Returns 100 times the current thread's recent_cpu value. */
+ int
+ thread_get_recent_cpu (void) {
+ 	/* TODO: Your implementation goes here */
+-	return 0;
++	/* Solution */
++	return FP2INT (MUL (FP (100), thread_current ()->recent_cpu));
++	/* Solution done.*/
+ }
+ 
+ /* Idle thread.  Executes when no other thread is ready to run.
+@@ -406,10 +499,30 @@ init_thread (struct thread *t, const char *name, int priority) {
+ 	memset (t, 0, sizeof *t);
+ 	t->status = THREAD_BLOCKED;
+ 	strlcpy (t->name, name, sizeof t->name);
++	//t->priority = priority;
++	/* Solution */
++	t->priority = t->effective_priority = priority;
++	list_init (&t->locks);
++	/* Solution done. */
+ 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
+ 	t->priority = priority;
+ 	t->magic = THREAD_MAGIC;
++#ifdef USERPROG
++	list_init (&t->childs);
++	list_init (&t->fd_list);
++	lock_init (&t->child_lock);
++#endif
++}
++
++/* Solution */
++bool
++compare_priority (const struct list_elem *A,
++		const struct list_elem *B, void *aux UNUSED) {
++	const struct thread *threadA = list_entry (A, struct thread, elem);
++	const struct thread *threadB = list_entry (B, struct thread, elem);
++	return threadA->effective_priority < threadB->effective_priority;
+ }
++/* Solution done. */
+ 
+ /* Chooses and returns the next thread to be scheduled.  Should
+    return a thread from the run queue, unless the run queue is
+@@ -420,8 +533,15 @@ static struct thread *
+ next_thread_to_run (void) {
+ 	if (list_empty (&ready_list))
+ 		return idle_thread;
++	/*
+ 	else
+ 		return list_entry (list_pop_front (&ready_list), struct thread, elem);
++	*/
++	/* Solution */
++	struct list_elem *elem = list_max (&ready_list, compare_priority, NULL);
++	struct thread *th = list_entry (elem, struct thread, elem);
++	list_remove (elem);
++	return th;
+ }
+ 
+ /* Use iretq to launch the thread */
+diff --git a/userprog/Make.vars b/userprog/Make.vars
+index b6c7fc4..8c3f052 100644
+--- a/userprog/Make.vars
++++ b/userprog/Make.vars
+@@ -7,6 +7,6 @@ TEST_SUBDIRS = tests/userprog tests/filesys/base tests/userprog/no-vm tests/thre
+ GRADING_FILE = $(SRCDIR)/tests/userprog/Grading.no-extra
+ 
+ # Uncomment the lines below to submit/test extra for project 2.
+-# TDEFINE := -DEXTRA2
+-# TEST_SUBDIRS += tests/userprog/dup2
+-# GRADING_FILE = $(SRCDIR)/tests/userprog/Grading.extra
++TDEFINE := -DEXTRA2
++TEST_SUBDIRS += tests/userprog/dup2
++GRADING_FILE = $(SRCDIR)/tests/userprog/Grading.extra
+diff --git a/userprog/exception.c b/userprog/exception.c
+index bf4a9b2..980130a 100644
+--- a/userprog/exception.c
++++ b/userprog/exception.c
+@@ -140,11 +140,18 @@ page_fault (struct intr_frame *f) {
+ 	write = (f->error_code & PF_W) != 0;
+ 	user = (f->error_code & PF_U) != 0;
+ 
++	/* To implement virtual memory, delete the rest of the function
++	   body, and replace it with code that brings in the page to
++	   which fault_addr refers. */
+ #ifdef VM
+ 	/* For project 3 and later. */
+ 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
+ 		return;
+ #endif
++	if (user) {
++		thread_current ()->exit_status = -1;
++		thread_exit ();
++	}
+ 
+ 	/* Count page faults. */
+ 	page_fault_cnt++;
+diff --git a/userprog/process.c b/userprog/process.c
+index 9388e50..b69ae42 100644
+--- a/userprog/process.c
++++ b/userprog/process.c
+@@ -7,6 +7,7 @@
+ #include <string.h>
+ #include "userprog/gdt.h"
+ #include "userprog/tss.h"
++#include "userprog/syscall.h"
+ #include "filesys/directory.h"
+ #include "filesys/file.h"
+ #include "filesys/filesys.h"
+@@ -15,6 +16,7 @@
+ #include "threads/interrupt.h"
+ #include "threads/palloc.h"
+ #include "threads/thread.h"
++#include "threads/malloc.h"
+ #include "threads/mmu.h"
+ #include "threads/vaddr.h"
+ #include "intrinsic.h"
+@@ -23,16 +25,34 @@
+ #endif
+ 
+ static void process_cleanup (void);
+-static bool load (const char *file_name, struct intr_frame *if_);
++static bool load (char *file_name, struct intr_frame *if_);
+ static void initd (void *f_name);
+ static void __do_fork (void *);
+ 
+ /* General process initializer for initd and other process. */
+ static void
+-process_init (void) {
++process_init (struct thread *parent, struct semaphore *sema, bool succ) {
+ 	struct thread *current = thread_current ();
++
++	current->wait_on_exit = succ;
++	if (succ) {
++		sema_init (&current->wait_sema, 0);
++		sema_init (&current->cleanup_ok, 0);
++		current->exit_status = -1;
++		lock_acquire (&parent->child_lock);
++		list_push_back (&parent->childs, &current->child_elem);
++		lock_release (&parent->child_lock);
++	}
++
++	sema_up (sema);
+ }
+ 
++struct initd_aux {
++	struct thread *parent;
++	char *file_name;
++	struct semaphore dial;
++};
++
+ /* Starts the first userland program, called "initd", loaded from FILE_NAME.
+  * The new thread may be scheduled (and may even exit)
+  * before process_create_initd() returns. Returns the initd's
+@@ -41,6 +61,7 @@ process_init (void) {
+ tid_t
+ process_create_initd (const char *file_name) {
+ 	char *fn_copy;
++	char *unused;
+ 	tid_t tid;
+ 
+ 	/* Make a copy of FILE_NAME.
+@@ -48,36 +69,88 @@ process_create_initd (const char *file_name) {
+ 	fn_copy = palloc_get_page (0);
+ 	if (fn_copy == NULL)
+ 		return TID_ERROR;
++
+ 	strlcpy (fn_copy, file_name, PGSIZE);
++	if (strlen(file_name) < PGSIZE) {
++		fn_copy[strlen(file_name) + 1] = 0;
++	}
++	fn_copy = strtok_r(fn_copy, " ", &unused);
+ 
+ 	/* Create a new thread to execute FILE_NAME. */
+-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
++	struct initd_aux *aux =
++		(struct initd_aux *) malloc (sizeof (struct initd_aux));
++	aux->file_name = fn_copy;
++	aux->parent = thread_current ();
++	sema_init (&aux->dial, 0);
++	tid = thread_create (fn_copy, PRI_DEFAULT, initd, aux);
+ 	if (tid == TID_ERROR)
+ 		palloc_free_page (fn_copy);
++	else
++		sema_down(&aux->dial);
++	free (aux);
+ 	return tid;
+ }
+ 
+ /* A thread function that launches first user process. */
+ static void
+-initd (void *f_name) {
++initd (void *aux_) {
++	struct initd_aux *aux = (struct initd_aux *) aux_;
++	char *f_name = aux->file_name;
++	struct thread *current = thread_current ();
++
++	/* STDIN */
++	struct filde *filde = (struct filde *) malloc (sizeof (struct filde));
++	*filde = (struct filde) {
++		.type = STDIN,
++		.fd = 0,
++	};
++	list_push_back (&current->fd_list, &filde->elem);
++
++	/* STDOUT */
++	filde = (struct filde *) malloc (sizeof (struct filde));
++	*filde = (struct filde) {
++		.type = STDOUT,
++		.fd = 1,
++	};
++
++	list_push_back (&current->fd_list, &filde->elem);
++
+ #ifdef VM
+ 	supplemental_page_table_init (&thread_current ()->spt);
+ #endif
+ 
+-	process_init ();
++	process_init (aux->parent, &aux->dial, true);
+ 
+ 	if (process_exec (f_name) < 0)
+ 		PANIC("Fail to launch initd\n");
+ 	NOT_REACHED ();
+ }
+ 
++struct fork_aux {
++	struct thread *parent;
++	struct intr_frame if_;
++	struct semaphore dial;
++	bool succ;
++};
++
+ /* Clones the current process as `name`. Returns the new process's thread id, or
+  * TID_ERROR if the thread cannot be created. */
+ tid_t
+-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
++process_fork (const char *name, struct intr_frame *if_) {
+ 	/* Clone current thread to new thread.*/
+-	return thread_create (name,
+-			PRI_DEFAULT, __do_fork, thread_current ());
++	struct fork_aux *aux = malloc (sizeof (struct fork_aux));
++	if (!aux)
++		return TID_ERROR;
++	aux->parent = thread_current ();
++	memcpy (&aux->if_, if_, sizeof (struct intr_frame));
++	sema_init (&aux->dial, 0);
++	tid_t tid = thread_create (name, thread_current()->priority, __do_fork, aux);
++	if (tid != TID_ERROR)
++		sema_down (&aux->dial);
++	if (!aux->succ)
++		tid = TID_ERROR;
++	free (aux);
++	return tid;
+ }
+ 
+ #ifndef VM
+@@ -91,70 +164,173 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
+ 	void *newpage;
+ 	bool writable;
+ 
+-	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
++	/* 1. If the parent_page is kernel page, then return immediately. */
++	if (is_kernel_vaddr (va))
++		return true;
+ 
+ 	/* 2. Resolve VA from the parent's page map level 4. */
+ 	parent_page = pml4_get_page (parent->pml4, va);
+ 
+-	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
+-	 *    TODO: NEWPAGE. */
++	/* 3. Allocate new PAL_USER page for the child and set result to
++	 *    NEWPAGE. */
++	newpage = palloc_get_page (PAL_USER);
++
++	if (newpage == NULL)
++		return false;
+ 
+-	/* 4. TODO: Duplicate parent's page to the new page and
+-	 *    TODO: check whether parent's page is writable or not (set WRITABLE
+-	 *    TODO: according to the result). */
++	/* 4. Duplicate parent's page to the new page and
++	 *    check whether parent's page is writable or not (set WRITABLE
++	 *    according to the result). */
++	memcpy (newpage, parent_page, PGSIZE);
++	writable = is_writable (pte);
+ 
+ 	/* 5. Add new page to child's page table at address VA with WRITABLE
+ 	 *    permission. */
+ 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
+-		/* 6. TODO: if fail to insert page, do error handling. */
++		/* 6. if fail to insert page, do error handling. */
++		palloc_free_page (newpage);
++		return false;
+ 	}
+ 	return true;
+ }
+ #endif
+ 
++struct fd_map {
++	int size;
++	int i;
++	struct entry {
++		struct file_obj *parent;
++		struct file_obj *child;
++	} entries[0];
++};
++
++static struct fd_map *
++new_map (struct list *l) {
++	struct fd_map *fd_maps =
++		(struct fd_map *) malloc (sizeof (struct fd_map) +
++				sizeof (struct entry) * list_size (l));
++	if (fd_maps) {
++		fd_maps->i = 0;
++		fd_maps->size = list_size (l);
++	}
++	return fd_maps;
++}
++
++static bool
++fd_map_add (struct fd_map *fd_map, struct file_obj *p, struct file_obj *c) {
++	if (fd_map->i >= fd_map->size)
++		return false;
++	fd_map->entries[fd_map->i].parent = p;
++	fd_map->entries[fd_map->i].child = c;
++	fd_map->i++;
++	return true;
++}
++
++static struct file_obj *
++fd_map_lookup (struct fd_map *fd_map, struct file_obj *f) {
++	for (int index = 0; index < fd_map->i; index++) {
++		if (fd_map->entries[index].parent == f)
++			return fd_map->entries[index].child;
++	}
++	return NULL;
++}
++
+ /* A thread function that copies parent's execution context.
+  * Hint) parent->tf does not hold the userland context of the process.
+  *       That is, you are required to pass second argument of process_fork to
+  *       this function. */
+ static void
+-__do_fork (void *aux) {
++__do_fork (void *aux_) {
+ 	struct intr_frame if_;
+-	struct thread *parent = (struct thread *) aux;
++	struct fork_aux *aux = (struct fork_aux *) aux_;
++	struct thread *parent = aux->parent;
+ 	struct thread *current = thread_current ();
+ 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
+-	struct intr_frame *parent_if;
+-	bool succ = true;
++	struct intr_frame *parent_if = &aux->if_;
++	bool succ = false;
+ 
+ 	/* 1. Read the cpu context to local stack. */
+ 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+ 
+ 	/* 2. Duplicate PT */
++	current->exit_status = 0;
+ 	current->pml4 = pml4_create();
++
+ 	if (current->pml4 == NULL)
+-		goto error;
++		goto out_no_free;
+ 
+ 	process_activate (current);
+ #ifdef VM
+ 	supplemental_page_table_init (&current->spt);
+ 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
+-		goto error;
++		goto out_no_free;
+ #else
+ 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
+-		goto error;
++		goto out_no_free;
+ #endif
+ 
++	/* ret = 0 */
++	if_.R.rax = 0;
++	/* Your code goes here.
++	 * Hint) To duplicate the file object, use `file_duplicate`
++	 *       in include/filesys/file.h. Note that parent should not return
++	 *       from the fork() until this function successfully duplicates
++	 *       the resources of parent.*/
++
++	/* Duplicate FDs: the parent holds the filesystem lock */
++	struct file_obj *nfile_obj;
++	struct list_elem *e;
++	struct filde *filde;
++	struct list *fd_list = &parent->fd_list;
++
++	struct fd_map *map = new_map (fd_list);
++	if (!map)
++		goto out_no_free;
++
++	for (e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e)) {
++		filde = list_entry (e, struct filde, elem);
++		struct filde *nfilde = (struct filde *) malloc (sizeof (struct filde));
++		if (!nfilde)
++			goto out;
++
++		*nfilde = *filde;
++
++		if (filde->type == FILE) {
++			nfile_obj = fd_map_lookup (map, filde->obj);
++			if (!nfile_obj) {
++				nfile_obj = (struct file_obj *) malloc (sizeof (struct file_obj));
++				if (nfile_obj) {
++					nfile_obj->file = file_duplicate (filde->obj->file);
++					nfile_obj->ref_cnt = 0;
++					fd_map_add (map, filde->obj, nfile_obj);
++				} else {
++					free (nfilde);
++					goto out;
++				}
++			}
++			nfile_obj->ref_cnt++;
++			nfilde->obj = nfile_obj;
++		}
++		list_push_back (&current->fd_list, &nfilde->elem);
++	}
++
+ 	/* TODO: Your code goes here.
+ 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
+ 	 * TODO:       in include/filesys/file.h. Note that parent should not return
+ 	 * TODO:       from the fork() until this function successfully duplicates
+ 	 * TODO:       the resources of parent.*/
+ 
+-	process_init ();
++	succ = true;
++out:
++	free (map);
++out_no_free:
++	aux->succ = succ;
++	/* Give control back to the parent */
++	process_init (parent, &aux->dial, succ);
+ 
+ 	/* Finally, switch to the newly created process. */
+ 	if (succ)
+ 		do_iret (&if_);
+-error:
+ 	thread_exit ();
+ }
+ 
+@@ -176,19 +352,42 @@ process_exec (void *f_name) {
+ 	/* We first kill the current context */
+ 	process_cleanup ();
+ 
++#ifdef VM
++	supplemental_page_table_init (&thread_current ()->spt);
++#endif
++
+ 	/* And then load the binary */
+ 	success = load (file_name, &_if);
+ 
+ 	/* If load failed, quit. */
+ 	palloc_free_page (file_name);
+-	if (!success)
+-		return -1;
+-
++	if (!success) {
++		thread_current ()->exit_status = -1;
++		thread_exit ();
++	}
+ 	/* Start switched process. */
+ 	do_iret (&_if);
+ 	NOT_REACHED ();
+ }
+ 
++static struct thread *
++get_child_by_id (struct thread *parent, tid_t tid) {
++	struct list_elem *e;
++	struct thread *th;
++	lock_acquire (&parent->child_lock);
++	for (e = list_begin (&parent->childs);
++			e != list_end (&parent->childs);
++			e = list_next (e)) {
++		th = list_entry (e, struct thread, child_elem);
++		if (th->tid == tid)
++			goto out;
++	}
++	th = NULL;
++out:
++	lock_release (&parent->child_lock);
++	return th;
++}
++
+ 
+ /* Waits for thread TID to die and returns its exit status.  If
+  * it was terminated by the kernel (i.e. killed due to an
+@@ -200,11 +399,20 @@ process_exec (void *f_name) {
+  * This function will be implemented in problem 2-2.  For now, it
+  * does nothing. */
+ int
+-process_wait (tid_t child_tid UNUSED) {
++process_wait (tid_t child_tid) {
+ 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
+ 	 * XXX:       to add infinite loop here before
+ 	 * XXX:       implementing the process_wait. */
+-	return -1;
++
++	int status = -1;
++	struct thread *child = get_child_by_id (thread_current (), child_tid);
++	if (child) {
++		sema_down (&child->wait_sema);
++		list_remove (&child->child_elem);
++		status = child->exit_status;
++		sema_up (&child->cleanup_ok);
++	}
++	return status;
+ }
+ 
+ /* Exit the process. This function is called by thread_exit (). */
+@@ -216,7 +424,30 @@ process_exit (void) {
+ 	 * TODO: project2/process_termination.html).
+ 	 * TODO: We recommend you to implement process resource cleanup here. */
+ 
++	/* Free the file descriptors */
++	struct list_elem *e;
++	while (!list_empty (&thread_current ()->fd_list)) {
++		e = list_pop_front (&thread_current ()->fd_list);
++		clean_filde (list_entry (e, struct filde, elem));
++	}
++
++	while (!list_empty (&thread_current ()->childs)) {
++		e = list_pop_front (&thread_current ()->childs);
++		struct thread *th = list_entry (e, struct thread, child_elem);
++		th->wait_on_exit = false;
++		sema_up (&th->cleanup_ok);
++	}
++
+ 	process_cleanup ();
++
++	if (curr->executable)
++		file_close (curr->executable);
++
++	if (curr->wait_on_exit) {
++		printf ("%s: exit(%d)\n", curr->name, curr->exit_status);
++		sema_up (&curr->wait_sema);
++		sema_down (&curr->cleanup_ok);
++	}
+ }
+ 
+ /* Free the current process's resources. */
+@@ -316,12 +547,67 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
+ 		uint32_t read_bytes, uint32_t zero_bytes,
+ 		bool writable);
+ 
++#define push8(x) \
++	if_->rsp -= sizeof(uint8_t); \
++	*(uint8_t *)if_->rsp = (uint8_t) x;
++
++#define push64(x) \
++	if_->rsp -= sizeof(uint64_t); \
++	*(uint64_t *)if_->rsp = (uint64_t) x;
++
++/* load() helpers. */
++/* setup argument: play with pointer! */
++static bool setup_argument (struct intr_frame *if_, char *file_name) {
++	char *endptr = file_name;
++	char *argarr;
++	char *ptr = endptr + strlen(endptr);
++
++	/* setup argv[][] */
++	for (; ptr != endptr; ptr--) {
++		if (*ptr == ' ') {
++			if (*(ptr + 1) != 0)
++				*ptr = 0;
++			else
++				continue;
++		}
++
++		push8 (*ptr);
++	}
++	push8 (*ptr);
++	argarr = (char *) if_->rsp;
++
++	/* align */
++	while (if_->rsp & 7)
++		if_->rsp--;
++
++	/* last argv ptr */
++	ptr = (char *) USER_STACK - 1;
++	int argc = 0;
++	push64 (0);
++
++	/* setup argv[] */
++	while (ptr != argarr) {
++		if (*(ptr - 1) == 0) {
++			push64 (ptr);
++			argc++;
++		}
++		ptr--;
++	}
++	push64 (ptr);
++	argc++;
++	if_->R.rdi = argc;
++	if_->R.rsi = if_->rsp;
++	push64 (0);
++
++	return true;
++}
++
+ /* Loads an ELF executable from FILE_NAME into the current thread.
+  * Stores the executable's entry point into *RIP
+  * and its initial stack pointer into *RSP.
+  * Returns true if successful, false otherwise. */
+ static bool
+-load (const char *file_name, struct intr_frame *if_) {
++load (char *file_name, struct intr_frame *if_) {
+ 	struct thread *t = thread_current ();
+ 	struct ELF ehdr;
+ 	struct file *file = NULL;
+@@ -411,6 +697,10 @@ load (const char *file_name, struct intr_frame *if_) {
+ 	if (!setup_stack (if_))
+ 		goto done;
+ 
++	/* setup argument */
++	*(file_name + strlen(file_name)) = ' ';
++	setup_argument (if_, file_name);
++
+ 	/* Start address. */
+ 	if_->rip = ehdr.e_entry;
+ 
+@@ -421,7 +711,13 @@ load (const char *file_name, struct intr_frame *if_) {
+ 
+ done:
+ 	/* We arrive here whether the load is successful or not. */
+-	file_close (file);
++	if (success) {
++		file_deny_write (file);
++		t->executable = file;
++	} else {
++		file_close (file);
++		t->executable = NULL;
++	}
+ 	return success;
+ }
+ 
+diff --git a/userprog/syscall.c b/userprog/syscall.c
+index 1928191..da835dd 100644
+--- a/userprog/syscall.c
++++ b/userprog/syscall.c
+@@ -4,13 +4,25 @@
+ #include "threads/interrupt.h"
+ #include "threads/thread.h"
+ #include "threads/loader.h"
++#include "threads/palloc.h"
++#include "threads/malloc.h"
++#include "threads/init.h"
++#include "threads/mmu.h"
++#include "filesys/file.h"
++#include "filesys/filesys.h"
+ #include "userprog/gdt.h"
++#include "userprog/process.h"
+ #include "threads/flags.h"
+ #include "intrinsic.h"
++#include "devices/input.h"
++#include "lib/string.h"
+ 
+ void syscall_entry (void);
+ void syscall_handler (struct intr_frame *);
+ 
++/* Big lock for filesystem. */
++struct lock filesys_lock;
++
+ /* System call.
+  *
+  * Previously system call services was handled by the interrupt handler
+@@ -35,12 +47,438 @@ syscall_init (void) {
+ 	 * mode stack. Therefore, we masked the FLAG_FL. */
+ 	write_msr(MSR_SYSCALL_MASK,
+ 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
++
++	lock_init (&filesys_lock);
++}
++
++static void
++error_die (void) {
++	thread_current ()->exit_status = -1;
++	thread_exit ();
++}
++
++static bool
++validate_ptr (const void *p, size_t size, bool writable) {
++	if (p == NULL || !is_user_vaddr (p))
++		return false;
++	struct thread *current = thread_current ();
++	void *ptr = pg_round_down (p);
++	for (; ptr <= pg_round_down (p + size); ptr += PGSIZE) {
++		uint64_t *pte = pml4e_walk (current->pml4, (uint64_t) ptr, 0);
++		if (pte == NULL ||
++				is_kern_pte(pte) ||
++				(writable && !is_writable (pte)))
++			return false;
++	}
++	return true;
++}
++
++static bool
++validate_string (const void *p) {
++	if (p == NULL || !is_user_vaddr (p))
++		return false;
++	struct thread *current = thread_current ();
++	void *ptr = pg_round_down (p);
++	for (; ; ptr += PGSIZE) {
++		uint64_t *pte = pml4e_walk (current->pml4, (uint64_t) ptr, 0);
++		if (pte == NULL || is_kern_pte(pte))
++			return false;
++
++		for (; *(char *)p != 0; p++);
++		if (*(char *)p == 0)
++			return true;
++	}
++}
++
++/* flide manager */
++static bool
++fd_sort (const struct list_elem *A, const struct list_elem *B, void *_a UNUSED) {
++	const struct filde *fdA = list_entry (A, struct filde, elem);
++	const struct filde *fdB = list_entry (B, struct filde, elem);
++
++	return fdA->fd < fdB->fd;
++}
++
++static struct filde *
++get_filde_by_fd (int32_t fd) {
++	struct list *fd_list = &thread_current()->fd_list;
++	struct list_elem *e;
++	struct filde *filde;
++	for (e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e)) {
++		filde = list_entry (e, struct filde, elem);
++		if (filde->fd == fd)
++			return filde;
++	}
++	return NULL;
++}
++
++static int
++allocate_fd (void) {
++	struct list *fd_list = &thread_current ()->fd_list;
++	struct list_elem *e;
++	struct filde *filde;
++	int32_t __fd = 0;
++	for (e = list_begin (fd_list);
++			e != list_end (fd_list);
++			e = list_next (e), __fd++) {
++		filde = list_entry (e, struct filde, elem);
++		if (filde->fd != __fd)
++			break;
++	}
++	return __fd;
++}
++
++static uint64_t
++SyS_fork (struct intr_frame *f) {
++	const char *name = (const char *) f->R.rdi;
++
++	if (!validate_string (name))
++		error_die ();
++
++	lock_acquire(&filesys_lock);
++	tid_t tid = process_fork (name, f);
++	lock_release(&filesys_lock);
++
++	return tid;
++}
++
++static uint64_t
++SyS_exec (struct intr_frame *f) {
++	char *fn_copy;
++	char *unused;
++	const char *fname = (const char *) f->R.rdi;
++
++	if (!validate_string (fname))
++		error_die ();
++
++	fn_copy = palloc_get_page (0);
++	if (fn_copy == NULL)
++		thread_exit ();
++
++	strlcpy (fn_copy, fname, PGSIZE);
++	if (strlen(fname) < PGSIZE) {
++		fn_copy[strlen(fname) + 1] = 0;
++	}
++	fn_copy = strtok_r(fn_copy, " ", &unused);
++
++	process_exec (fn_copy);
++	NOT_REACHED();
++	return -1;
++}
++
++static uint64_t
++SyS_create (struct intr_frame *f) {
++	const char *fname = (const char *) f->R.rdi;
++	unsigned initial_size = f->R.rsi;
++	int ret;
++
++	if (!validate_string (fname) || !strcmp (fname, ""))
++		error_die ();
++
++	lock_acquire (&filesys_lock);
++	ret = filesys_create (fname, initial_size);
++	lock_release (&filesys_lock);
++	return ret;
++}
++
++static uint64_t
++SyS_remove (struct intr_frame *f) {
++	const char *fname = (const char *) f->R.rdi;
++	int ret;
++
++	if (!validate_string (fname))
++		error_die ();
++
++	lock_acquire (&filesys_lock);
++	ret = filesys_remove (fname);
++	lock_release (&filesys_lock);
++	return ret;
++}
++
++static uint64_t
++SyS_open (struct intr_frame *f) {
++	const char *fname = (const char *) f->R.rdi;
++	struct thread *t = thread_current ();
++	struct file *file;
++	struct filde *filde;
++	int fd;
++	int ret = -1;
++
++	if (!validate_string (fname))
++		error_die ();
++
++	lock_acquire(&filesys_lock);
++	fd = allocate_fd ();
++	if (fd >= 0) {
++		file = filesys_open(fname);
++		if (file) {
++			filde = (struct filde *) malloc (sizeof (struct filde));
++			if (filde) {
++				struct file_obj *obj =
++					(struct file_obj *) malloc (sizeof (struct file_obj));
++				if (obj) {
++					ret = fd;
++					*obj = (struct file_obj) {
++						.file = file,
++						.ref_cnt = 1,
++					};
++					*filde = (struct filde) {
++						.fd = ret,
++						.obj = obj,
++						.type = FILE,
++					};
++					list_insert_ordered (&t->fd_list, &filde->elem, fd_sort, NULL);
++				} else
++					free (filde);
++			} else
++				file_close (file);
++		}
++	}
++	lock_release (&filesys_lock);
++	return ret;
++}
++
++static uint64_t
++SyS_filesize (struct intr_frame *f) {
++	int32_t fd = f->R.rdi;
++	struct filde *filde;
++	int ret = -1;
++
++	lock_acquire (&filesys_lock);
++	filde = get_filde_by_fd (fd);
++	if (filde)
++		ret = file_length (filde->obj->file);
++	lock_release (&filesys_lock);
++	return ret;
++}
++
++static uint64_t
++SyS_read (struct intr_frame *f) {
++	int fd = f->R.rdi;
++	char *buf = (char *) f->R.rsi;
++	size_t size = f->R.rdx;
++	size_t read_bytes = 0;
++	struct filde *filde;
++	int ret = -1;
++
++	if (!validate_ptr (buf, size, true))
++		error_die ();
++
++	lock_acquire (&filesys_lock);
++	filde = get_filde_by_fd (fd);
++	if (filde) {
++		switch (filde->type) {
++			case STDIN:
++				for (; read_bytes < size; read_bytes++)
++					buf[read_bytes] = input_getc ();
++				break;
++			case STDOUT:
++				ret = -1;
++				break;
++			default:
++				ret = file_read (filde->obj->file, buf, size);
++				break;
++		}
++	}
++	lock_release (&filesys_lock);
++	return ret;
++}
++
++static uint64_t
++SyS_write (struct intr_frame *f) {
++	int fd = f->R.rdi;
++	char *buf = (char *) f->R.rsi;
++	size_t size = f->R.rdx;
++	struct filde *filde;
++	int ret = -1;
++
++	if (!validate_ptr (buf, size, false))
++		error_die ();
++
++	lock_acquire (&filesys_lock);
++	filde = get_filde_by_fd (fd);
++	if (filde) {
++		switch (filde->type) {
++			case STDIN:
++				break;
++			case STDOUT:
++				putbuf (buf, size);
++				ret = size;
++				break;
++			default:
++				ret = file_write (filde->obj->file, buf, size);
++				break;
++		}
++	}
++	lock_release (&filesys_lock);
++	return ret;
++}
++
++static uint64_t
++SyS_seek (struct intr_frame *f) {
++	int32_t fd = f->R.rdi;
++	unsigned position = f->R.rsi;
++	struct filde *filde;
++
++	lock_acquire (&filesys_lock);
++	filde = get_filde_by_fd (fd);
++	if (filde && filde->obj)
++		file_seek (filde->obj->file, position);
++	lock_release (&filesys_lock);
++	return 0;
++}
++
++static uint64_t
++SyS_tell (struct intr_frame *f) {
++	int32_t fd = f->R.rdi;
++	struct filde *filde;
++	int ret = -1;
++
++	lock_acquire (&filesys_lock);
++	filde = get_filde_by_fd (fd);
++	if (filde && filde->obj)
++		ret = file_tell (filde->obj->file);
++	lock_release (&filesys_lock);
++	return ret;
++}
++
++static void
++deref_file_obj (struct file_obj *obj) {
++	ASSERT (obj != NULL);
++	ASSERT (obj->ref_cnt > 0);
++
++	if (--obj->ref_cnt == 0) {
++		file_close (obj->file);
++		free (obj);
++	}
++}
++
++bool
++clean_filde (struct filde *filde) {
++	if (filde) {
++		if (filde->type == FILE)
++			deref_file_obj (filde->obj);
++		free (filde);
++		return true;
++	}
++	return false;
++}
++
++static uint64_t
++__do_close (int fd) {
++	int ret = -1;
++
++	lock_acquire (&filesys_lock);
++	struct filde *filde = get_filde_by_fd (fd);
++	if (filde) {
++		list_remove (&filde->elem);
++		ret = clean_filde (filde);
++	}
++	lock_release (&filesys_lock);
++	return ret;
++}
++
++static uint64_t
++SyS_close (struct intr_frame *f) {
++	int32_t fd = f->R.rdi;
++	return __do_close (fd);
++}
++
++static uint64_t
++SyS_dup2 (struct intr_frame *f) {
++	int32_t oldfd = f->R.rdi;
++	int32_t newfd = f->R.rsi;
++	struct filde *filde, *new_filde;
++	int ret = -1;
++
++	/* Fail if invalid fd */
++	if (newfd < 0)
++		return ret;
++
++	lock_acquire (&filesys_lock);
++	filde = get_filde_by_fd (oldfd);
++	new_filde = get_filde_by_fd (newfd);
++	if (!filde)
++		ret = -1;
++	else if (newfd == oldfd)
++		ret = newfd;
++	else {
++		/* close if new_filde is avail. */
++		if (new_filde) {
++			list_remove (&new_filde->elem);
++			clean_filde (new_filde);
++		}
++		new_filde = (struct filde *) malloc (sizeof (struct filde));
++		if (new_filde) {
++			*new_filde = *filde;
++			new_filde->fd = newfd;
++			if (new_filde->obj)
++				new_filde->obj->ref_cnt++;
++
++			list_insert_ordered (&thread_current ()->fd_list, &new_filde->elem,
++					fd_sort, NULL);
++			ret = newfd;
++		}
++	}
++	lock_release (&filesys_lock);
++	return ret;
+ }
+ 
+ /* The main system call interface */
+ void
+-syscall_handler (struct intr_frame *f UNUSED) {
+-	// TODO: Your implementation goes here.
+-	printf ("system call!\n");
+-	thread_exit ();
++syscall_handler (struct intr_frame *f) {
++	switch (f->R.rax) {
++		case SYS_HALT:
++			power_off ();
++			NOT_REACHED ();
++			break;
++		case SYS_EXIT:
++			thread_current ()->exit_status = f->R.rdi;
++			thread_exit ();
++			NOT_REACHED ();
++			break;
++		case SYS_FORK:
++			f->R.rax = SyS_fork (f);
++			break;
++		case SYS_EXEC:
++			f->R.rax = SyS_exec (f);
++			break;
++		case SYS_WAIT:
++			f->R.rax = process_wait(f->R.rdi);
++			break;
++		case SYS_CREATE:
++			f->R.rax = SyS_create (f);
++			break;
++		case SYS_REMOVE:
++			f->R.rax = SyS_remove (f);
++			break;
++		case SYS_OPEN:
++			f->R.rax = SyS_open (f);
++			break;
++		case SYS_FILESIZE:
++			f->R.rax = SyS_filesize (f);
++			break;
++		case SYS_READ:
++			f->R.rax = SyS_read (f);
++			break;
++		case SYS_WRITE:
++			f->R.rax = SyS_write (f);
++			break;
++		case SYS_SEEK:
++			f->R.rax = SyS_seek (f);
++			break;
++		case SYS_TELL:
++			f->R.rax = SyS_tell (f);
++			break;
++		case SYS_CLOSE:
++			f->R.rax = SyS_close (f);
++			break;
++		case SYS_DUP2:
++			f->R.rax = SyS_dup2 (f);
++			break;
++		default:
++			printf ("Unexpected Syscall: %llx", f->R.rax);
++			f->R.rax = -1;
++			break;
++	}
+ }

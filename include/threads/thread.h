@@ -4,7 +4,9 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 #include "threads/interrupt.h"
+#include "threads/fixed-point.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -27,6 +29,38 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+// struct file_obj {
+// 	struct file *file;
+// 	int ref_cnt;
+// };
+
+// struct filde {
+// 	enum { STDIN, STDOUT, FILE } type;
+// 	int fd;
+// 	struct list_elem elem;
+// 	struct file_obj *obj;
+// };
+
+struct file_obj {
+	struct file *file;
+	int ref_cnt;
+};
+
+struct filde {
+	enum { STDIN, STDOUT, FILE } type;
+	int fd;
+	struct list_elem elem;
+	struct file_obj *obj;
+};
+
+// struct filde {
+//     enum { STDIN, STDOUT, FILE } type;
+//     int fd;
+//     struct list_elem elem; // to traverse linked list
+//     struct file *file;     // pointer to file
+//     int ref_cnt;           // reference count of the file.
+// };
 
 /* A kernel thread or user process.
  *
@@ -95,9 +129,37 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
+	/* Solution */
+	int64_t ticks;                      /* Saved ticks */
+	int effective_priority;             /* Effective Priority */
+	struct list_elem lock_elem;         /* for waiters in struct lock */
+	struct list locks;                  /* List of locks thread hold */
+
+	struct lock *waiting_lock;
+	struct thread *donator;
+	struct thread *donatee;
+	int nice;
+	FP recent_cpu;
+	/* Solution done. */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
+	struct file *executable;
+	int exit_status;
+	struct semaphore wait_sema;
+	struct semaphore cleanup_ok;
+	
+	struct list_elem child_elem;
+	struct list childs;
+	struct lock child_lock;
+
+	struct list fd_list;
+	bool wait_on_exit;
+
+	//Viera Add
+	bool fork_succeed;
+	struct semaphore fork_sema;
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
@@ -113,6 +175,13 @@ struct thread {
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+
+/* Solution */
+struct list block_list;
+bool compare_priority (const struct list_elem *A,
+		const struct list_elem *B, void *aux UNUSED);
+
+/* Solution done. */
 
 void thread_init (void);
 void thread_start (void);

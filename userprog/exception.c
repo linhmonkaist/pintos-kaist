@@ -140,11 +140,18 @@ page_fault (struct intr_frame *f) {
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
+	/* To implement virtual memory, delete the rest of the function
+	   body, and replace it with code that brings in the page to
+	   which fault_addr refers. */
 #ifdef VM
 	/* For project 3 and later. */
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
+	if (user) {
+		thread_current ()->exit_status = -1;
+		thread_exit ();
+	}
 
 	/* Count page faults. */
 	page_fault_cnt++;
