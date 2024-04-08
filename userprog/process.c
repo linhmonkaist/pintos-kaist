@@ -28,32 +28,22 @@ static void process_cleanup (void);
 static bool load ( char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+static struct thread* get_child_tid (tid_t child_tid);
 
 /* General process initializer for initd and other process. */
 static void
-process_init (struct thread *parent, struct semaphore *sema, bool succ, char *args, int args_cnt) {
+process_init (struct thread *parent, bool succ, char *args, int args_cnt) {
 	struct thread *current = thread_current ();
 
 	current->wait_on_exit = succ;
 	if (succ) {
-		// sema_init (&current->wait_sema, 0);
-		// sema_init (&current->cleanup_ok, 0);
 		current->exit_status = -1;
-		lock_acquire (&parent->child_lock);
-		// list_push_back (&parent->childs, &current->child_elem);
-		lock_release (&parent->child_lock);
 	}
 
-	sema_up (sema);
+	// sema_up (sema);
 }
 
-struct initd_aux {
-	struct thread *parent;
-	char *file_name;
-	struct semaphore dial;
-	char *arguments; 
-	int arguments_count; 
-};
+
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
  * The new thread may be scheduled (and may even exit)
  * before process_create_initd() returns. Returns the initd's
@@ -74,8 +64,8 @@ process_create_initd (const char *file_name) {
 	if (fn_copy == NULL || copy_to_get_args == NULL) 
 		return TID_ERROR;
 
-	struct initd_aux *aux =
-		(struct initd_aux *) malloc (sizeof (struct initd_aux));
+	struct fork_fd *aux =
+		(struct fork_fd *) malloc (sizeof (struct fork_fd));
 
 	strlcpy (fn_copy, file_name, PGSIZE);
 	strlcpy (copy_to_get_args, file_name, PGSIZE);
@@ -85,8 +75,7 @@ process_create_initd (const char *file_name) {
 	if (strlen(copy_to_get_args) < PGSIZE) {
 		copy_to_get_args[strlen(file_name) + 1] = 0;
 	}
-	aux -> arguments = copy_to_get_args; 
-	aux -> arguments_count = 0; 
+
 	fn_copy = strtok_r(fn_copy, " ", &unused);
 
 	/* Create a new thread to execute FILE_NAME. */
@@ -94,7 +83,7 @@ process_create_initd (const char *file_name) {
 	aux->file_name = fn_copy;
 	aux->parent = thread_current ();
 
-	sema_init (&aux->dial, 0);
+	sema_init (&aux-> init_dial, 0);
 	for (char *token= strtok_r(copy_to_get_args," ", &save_ptr); token != NULL;
 	token = strtok_r(NULL, " ", &save_ptr)){
 		aux -> arguments_count ++; 
@@ -105,7 +94,7 @@ process_create_initd (const char *file_name) {
 		palloc_free_page (copy_to_get_args); 
 	}
 	else
-		sema_down(&aux->dial);
+		sema_down(&aux-> init_dial);
 	free (aux);
 	return tid;
 }
@@ -113,15 +102,14 @@ process_create_initd (const char *file_name) {
 /* A thread function that launches first user process. */
 static void
 initd (void *input) {
-	struct initd_aux *aux = (struct initd_aux *) input;
+	struct fork_fd *aux = (struct fork_fd *) input;
 	char *f_name = aux->file_name;
-	//solution
+
 	struct thread *current = thread_current ();
 
 	/* STDIN */
 	struct filde *filde = (struct filde *) malloc (sizeof (struct filde));
 	*filde = (struct filde) {
-		.type = STDIN,
 		.fd = 0,
 	};
 	list_push_back (&current->fd_list, &filde->elem);
@@ -129,18 +117,17 @@ initd (void *input) {
 	/* STDOUT */
 	filde = (struct filde *) malloc (sizeof (struct filde));
 	*filde = (struct filde) {
-		.type = STDOUT,
 		.fd = 1,
 	};
 
 	list_push_back (&current->fd_list, &filde->elem);
-	//end solution
+
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
-	process_init (aux->parent, &aux->dial, true, aux -> arguments, aux -> arguments_count);
-
+	process_init (aux->parent, true, aux -> arguments, aux -> arguments_count);
+	sema_up(&aux-> init_dial); 
 	if (process_exec (f_name) < 0)
 		//make process run
 		PANIC("Fail to launch initd\n");
@@ -152,21 +139,21 @@ initd (void *input) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ ) {
 	struct thread *curr = thread_current ();
-	struct fork_aux *fork_temp = calloc (1, sizeof (struct fork_aux));
+	struct fork_fd *fork_temp = calloc (1, sizeof (struct fork_fd));
+	// struct fork_fd fork_temp;
 	
 	fork_temp->parent = curr; //set thread to current thread
 
 	memcpy (&fork_temp->if_, if_, sizeof (struct intr_frame)); //copy if_ to if_
 	sema_init (&fork_temp->status.dial, 0);
-	
+
 	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, fork_temp);
 	if (tid != TID_ERROR){
-		fork_temp -> status.fork_id = tid; 
 		sema_down (&fork_temp->status.dial);
 	}
 	if (!fork_temp->status.succ){
 		tid = TID_ERROR;
-		fork_temp -> status.fork_id = TID_ERROR; 
+		fork_temp->status.fork_id = TID_ERROR; 
 	}
 		
 	free (fork_temp);
@@ -213,7 +200,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	return true;
 }
 #endif
-struct fd_map {
+struct fd_dict {
     int size;
     int i;
     struct entry *entries; // Use a pointer to an array of entries
@@ -224,8 +211,8 @@ struct entry {
     struct file_obj *child;
 };
 
-static struct fd_map *new_map(struct list *l) {
-    struct fd_map *fd_maps = malloc(sizeof(struct fd_map));
+static struct fd_dict *new_map(struct list *l) {
+    struct fd_dict *fd_maps = malloc(sizeof(struct fd_dict));
     if (fd_maps) {
         fd_maps->size = list_size(l);
         fd_maps->i = 0;
@@ -237,7 +224,7 @@ static struct fd_map *new_map(struct list *l) {
     }
     return fd_maps;
 }
-static bool fd_map_add(struct fd_map *fd_map, struct file_obj *p, struct file_obj *c) {
+static bool fd_map_add(struct fd_dict *fd_map, struct file_obj *p, struct file_obj *c) {
     if (!fd_map || fd_map->i >= fd_map->size) {
         // Log error or handle it more gracefully
         return false;
@@ -245,16 +232,16 @@ static bool fd_map_add(struct fd_map *fd_map, struct file_obj *p, struct file_ob
     fd_map->entries[fd_map->i++] = (struct entry){ .parent = p, .child = c };
     return true;
 }
-static struct file_obj *fd_map_lookup(struct fd_map *fd_map, struct file_obj *f) {
+static struct file_obj *fd_map_lookup(struct fd_dict *fd_map, struct file_obj *f) {
     if (!fd_map) return NULL;
     for (int index = 0; index < fd_map->i; index++) {
         if (fd_map->entries[index].parent == f)
             return fd_map->entries[index].child;
     }
-    return NULL; // Could log that no matching entry was found
+    return NULL; 
 }
 
-static void free_map(struct fd_map *map){
+static void free_map(struct fd_dict *map){
 	free(map -> entries);
 	free(map);
 }
@@ -266,7 +253,7 @@ static void free_map(struct fd_map *map){
 static void
 __do_fork (void *aux_) {
 	struct intr_frame if_;
-	struct fork_aux *aux = (struct fork_aux *) aux_;
+	struct fork_fd *aux = (struct fork_fd *) aux_;
 	struct thread *parent = aux->parent;
 	struct thread *current = thread_current ();
 
@@ -283,16 +270,16 @@ __do_fork (void *aux_) {
 	current->pml4 = pml4_create();
 
 	if (current->pml4 == NULL)
-		goto out_no_free;
+		goto error;
 
 	process_activate (current);
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
-		goto out_no_free;
+		goto error;
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
-		goto out_no_free;
+		goto error;
 #endif
 
 	/* TODO: Your code goes here.
@@ -302,24 +289,25 @@ __do_fork (void *aux_) {
 	 * TODO:       the resources of parent.*/
 	if_.R.rax = 0;
 	struct file_obj *nfile_obj;
-	struct list_elem *e;
 	struct filde *filde;
 	struct list *fd_list = &parent->fd_list;
 
-	struct fd_map *map = new_map (fd_list);
-	if (!map)
-		goto out_no_free;
+	struct fd_dict *map = new_map (fd_list);
+	if (map == NULL)
+		goto error;
 
-	for (e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e)) {
+	for (struct list_elem *e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e)) {
 		filde = list_entry (e, struct filde, elem);
 		struct filde *nfilde = (struct filde *) malloc (sizeof (struct filde));
-		if (!nfilde){
+		if (nfilde == NULL){
 			free_map(map);
-			goto out_no_free; 
+			goto error; 
 		}
 
-		*nfilde = *filde;
-		if (filde -> type != FILE){
+		nfilde -> fd = filde -> fd;
+		nfilde -> elem = filde -> elem;
+		nfilde -> obj = filde -> obj;
+		if (filde -> fd < 2 ){
 			list_push_back (&current->fd_list, &nfilde->elem);
 			continue;
 		}
@@ -331,10 +319,10 @@ __do_fork (void *aux_) {
 			continue;
 		}
 		nfile_obj = (struct file_obj *) malloc (sizeof (struct file_obj));
-		if (!nfile_obj) {
+		if (nfile_obj == NULL) {
 			free(nfilde);
 			free_map(map);
-			goto out_no_free; 
+			goto error; 
 		}
 		nfile_obj->file = file_duplicate (filde->obj->file);
 		nfile_obj->ref_cnt = 0;
@@ -343,7 +331,7 @@ __do_fork (void *aux_) {
 			free(nfile_obj); //Viera Add
 			free (nfilde);
 			free_map(map);
-			goto out_no_free; 
+			goto error; 
 		}
 		nfile_obj->ref_cnt++;
 		nfilde->obj = nfile_obj;
@@ -352,15 +340,14 @@ __do_fork (void *aux_) {
 
 	succ = true;
 
-out_no_free:
+error:
 	// parent->fork_succeed = succ; //struct thread *parent = aux->parent;
 	aux->status.succ = succ;
 	char *unuse;
 	int args = 0; 
 	/* Give control back to the parent */
-	process_init (parent, &aux->status.dial, succ, unuse, args);
-	// process_init (parent, &fork_sema, succ);
-
+	process_init (parent, succ, unuse, args);
+	sema_up (&aux->status.dial);
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
@@ -403,18 +390,18 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
-static struct thread* 
-get_child_tid (tid_t child_tid) {
+static struct thread* get_child_tid (tid_t child_tid) {
   struct list *children = &(thread_current ()->childs);
   struct list_elem *e = list_begin (children);
+  int cnt_to_child = 0;
 
   while (e != list_end (children)) {
     struct thread *child_th = list_entry (e, struct thread, child_elem);
     if (child_th->tid == child_tid)
       return child_th;
+	cnt_to_child ++; 
 	e = list_next (e);
   }
-
   return NULL;
 };
 
@@ -462,15 +449,23 @@ process_exit (void) {
 	struct list_elem *e;
 	while (!list_empty (&thread_current ()->fd_list)) {
 		e = list_pop_front (&thread_current ()->fd_list);
-		clean_filde (list_entry (e, struct filde, elem));
+		struct filde *filde = list_entry (e, struct filde, elem); 
+		if (filde-> fd > 1){
+			struct file_obj *obj = filde -> obj; 
+			if (--obj->ref_cnt == 0) {
+				file_close (obj->file);
+				free (obj);
+			}
+		}
+		free (filde);
 	}
 
-	while (!list_empty (&thread_current ()->childs)) {
-		e = list_pop_front (&thread_current ()->childs);
-		struct thread *th = list_entry (e, struct thread, child_elem);
-		th->wait_on_exit = false;
-		sema_up (&th->cleanup_ok);
-	}
+	// while (!list_empty (&thread_current ()->childs)) {
+	// 	e = list_pop_front (&thread_current ()->childs);
+	// 	struct thread *th = list_entry (e, struct thread, child_elem);
+	// 	th->wait_on_exit = false;
+	// 	sema_up (&th->cleanup_ok);
+	// }
 
 	process_cleanup ();
 

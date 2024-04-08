@@ -18,10 +18,14 @@ struct fork_status {
     int stt_exit; 
 };
 
-struct fork_aux {
+struct fork_fd {
     struct thread *parent;
     struct intr_frame if_;
-    struct fork_status status; // Nested structure within fork_aux
+    char *file_name;
+    struct semaphore init_dial;
+    struct fork_status status; // Nested structure 
+    char *arguments;
+    int arguments_count; 
 };
 
 #endif /* userprog/process.h */

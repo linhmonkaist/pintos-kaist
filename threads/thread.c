@@ -555,6 +555,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 		lock_init (&t->child_lock);
 		sema_init (&t->wait_sema, 0);
 		sema_init (&t->cleanup_ok, 0);
+		sema_init (&t->fork_sema, 0);
 	#endif	
 	//end solution
 }

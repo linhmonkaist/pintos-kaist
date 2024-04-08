@@ -95,7 +95,7 @@ struct file_obj {
 };
 
 struct filde {
-	enum FILETYPE type;
+	// enum FILETYPE type;
 	int fd;
 	struct list_elem elem;
 	struct file_obj *obj;

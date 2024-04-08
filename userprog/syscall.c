@@ -4,18 +4,20 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/loader.h"
+//solution_2
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/init.h"
 #include "threads/mmu.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
-#include "userprog/gdt.h"
 #include "userprog/process.h"
-#include "threads/flags.h"
-#include "intrinsic.h"
 #include "devices/input.h"
 #include "lib/string.h"
+//end solution_2
+#include "userprog/gdt.h"
+#include "threads/flags.h"
+#include "intrinsic.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -51,18 +53,9 @@ syscall_init (void) {
 	lock_init (&filesys_lock);
 }
 
+
 static bool
-validate_ptr (const void *p, size_t size, bool writable) {
-	if (p == NULL || !is_user_vaddr (p)){
-		return false;
-	}
-	if (pml4_get_page(thread_current()->pml4, p) == NULL){
-		return false;
-	}
-	return true;
-}
-static bool
-validate_string (const void *p) {
+pointer_validate (const void *p) {
 	if (p == NULL || !is_user_vaddr (p)){
 		return false;
 	}
@@ -72,7 +65,7 @@ validate_string (const void *p) {
 	return true;
 }
 
-static bool fd_sort (const struct list_elem *A, const struct list_elem *B, void *_a UNUSED) {
+static bool fd_arrange (const struct list_elem *A, const struct list_elem *B, void *_a UNUSED) {
 	bool ans = list_entry (A, struct filde, elem) -> fd < list_entry (B, struct filde, elem) ->fd;
 	return ans;
 }
@@ -101,15 +94,22 @@ static int get_new_fd(struct thread *t){
 }
 
 static struct filde *
-get_filde_by_fd (int32_t fd) {
+get_filde (int32_t fd) {
 	struct list *fd_list = &thread_current()->fd_list;
-	struct list_elem *e;
 	struct filde *filde;
-	for (e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e)) {
+	int cnt = 0; 
+	struct list_elem *e = list_begin (fd_list); 
+	while (e != list_end (fd_list)) {
 		filde = list_entry (e, struct filde, elem);
-		if (filde->fd == fd)
-			return filde;
+		cnt ++; 
+		if (filde->fd != fd){
+			e = list_next (e);
+			continue;
+		}
+		return filde;
+		e = list_next (e);
 	}
+	cnt = 0;
 	return NULL;
 }
 /*Fuction to check string is valid or not*/
@@ -119,13 +119,8 @@ static bool check_string(const char *filename){
 	return true; 
 }
 static uint64_t
-SyS_fork (struct intr_frame *f) {
+syscall_fork (struct intr_frame *f) {
 	const char *name = (const char *) f->R.rdi;
-
-	if (!validate_string (name)){
-		thread_current () -> exit_status = -1;
-		thread_exit ();
-	}
 
 	// lock_acquire(&filesys_lock);
 	tid_t tid = process_fork (name, f);
@@ -134,14 +129,8 @@ SyS_fork (struct intr_frame *f) {
 	return tid;
 }
 
-static uint64_t
-SyS_exec (struct intr_frame *f) {
+static uint64_t syscall_exec (struct intr_frame *f) {
 	char *unused;
-	if (!validate_string (f->R.rdi)){
-		thread_current() -> exit_status = -1;
-		thread_exit(); 
-	}
-
 	char *fn_copy = palloc_get_page (0);
 	if (fn_copy == NULL) thread_exit ();
 
@@ -157,33 +146,22 @@ SyS_exec (struct intr_frame *f) {
 	}
 	fn_copy = strtok_r(fn_copy, " ", &unused);
 
-	if (process_exec (fn_copy) == -1) thread_exit ();
+	if (process_exec (fn_copy) == -1) {
+		thread_exit ();
+	}
 	NOT_REACHED();
 	return -1;
 }
 static uint64_t
-SyS_create (struct intr_frame *f) {
-	const char *fname = (const char *) f->R.rdi;
-
-	if (!validate_string (fname) || !strcmp (fname, "")){
-		thread_current() -> exit_status = -1;
-		thread_exit();
-	}
-
+syscall_create (struct intr_frame *f) {
 	lock_acquire (&filesys_lock);
 	int ret = filesys_create (f->R.rdi, f->R.rsi);
 	lock_release (&filesys_lock);
 	return ret;
 }
 static uint64_t
-SyS_remove (struct intr_frame *f) {
+syscall_remove (struct intr_frame *f) {
 	const char *fname = (const char *) f->R.rdi;
-
-	if (!validate_string (fname)){
-		thread_current() -> exit_status = -1;
-		thread_exit(); 
-	}
-
 	lock_acquire (&filesys_lock);
 	int ret = filesys_remove (fname);
 	lock_release (&filesys_lock);
@@ -197,23 +175,18 @@ static void get_file_with_fd(struct filde *filde, int fd, struct file_obj *obj, 
 	*filde = (struct filde) {
 		.fd = fd,
 		.obj = obj,
-		.type = FILE,
+		// .type = FILE,
 	};
-	list_insert_ordered (&t->fd_list, &filde->elem, fd_sort, NULL);
+	list_insert_ordered (&t->fd_list, &filde->elem, fd_arrange, NULL);
 }
 static uint64_t
-SyS_open (struct intr_frame *f) {
+syscall_open (struct intr_frame *f) {
 	const char *fname = (const char *) f->R.rdi;
 	struct thread *t = thread_current ();
 	struct file *file;
 	struct filde *filde;
 	int fd;
 	int ret = -1;
-
-	if (!validate_string (fname)){
-		thread_current ()-> exit_status = -1;
-		thread_exit ();
-	}
 
 	lock_acquire(&filesys_lock);
 	fd = get_new_fd (t);
@@ -249,7 +222,7 @@ SyS_open (struct intr_frame *f) {
 }
 
 static uint64_t
-SyS_filesize (struct intr_frame *f) {
+syscall_filesize (struct intr_frame *f) {
 	struct thread *t = thread_current(); 
 	int32_t fd = f -> R.rdi; 
 	struct filde *fld = NULL;
@@ -284,19 +257,16 @@ static size_t handle_STDIN(struct intr_frame *f){
 }
 /*Function to handle read system call*/
 static uint64_t
-SyS_read (const struct intr_frame *f) {
-	if (!validate_string (f -> R.rsi)){
-		thread_current() -> exit_status = -1;
-		thread_exit(); 
-	}
-
+syscall_read (const struct intr_frame *f) {
 	struct thread *t = thread_current(); 
 	int32_t fd = f -> R.rdi; 
-	struct filde *fld =get_filde_by_fd (fd);
+	struct filde *fld =get_filde (fd);
 
 	if (!fld) return -1; 
-	if (fld -> type == STDOUT) return -1; 
-	if (fld -> type == STDIN){
+	// if (fld -> type == STDOUT) return -1; 
+	// if (fld -> type == STDIN){
+	if (fld -> fd == 1) return -1; 
+	if (fld -> fd == 0){
 		return handle_STDIN(f); 
 	}
 
@@ -307,16 +277,13 @@ SyS_read (const struct intr_frame *f) {
 }
 /*Function to handle write system call*/
 static uint64_t
-SyS_write (struct intr_frame *f) {
-	if (!validate_string (f -> R.rsi)){
-		thread_current() -> exit_status = -1;
-		// printf ("%s: exit(%d)\n", thread_current() ->name, thread_current() ->exit_status);
-		thread_exit(); 
-	}
-	struct filde *filde = get_filde_by_fd (f->R.rdi);
+syscall_write (struct intr_frame *f) {
+	struct filde *filde = get_filde(f->R.rdi);
 	if (!filde) return -1;
-	if (filde -> type == STDIN) return -1; 
-	if (filde -> type == STDOUT){
+	// if (filde -> type == STDIN) return -1; 
+	// if (filde -> type == STDOUT){
+	if (filde -> fd == 0) return -1; 
+	if (filde -> fd == 1){
 		putbuf(f->R.rsi, f->R.rdx);
 		return f->R.rdx; 
 	}
@@ -325,7 +292,7 @@ SyS_write (struct intr_frame *f) {
 	lock_release (&filesys_lock);
 	return ret;
 }
-static void SyS_seek (struct intr_frame *f) {
+static void syscall_seek (struct intr_frame *f) {
 	struct thread *t = thread_current(); 
 	int32_t fd = f -> R.rdi; 
 	struct filde *fld = NULL;
@@ -343,7 +310,7 @@ static void SyS_seek (struct intr_frame *f) {
 	lock_release (&filesys_lock);
 }
 static uint64_t
-SyS_tell (struct intr_frame *f) {
+syscall_tell (struct intr_frame *f) {
 	struct thread *t = thread_current(); 
 	int32_t fd = f -> R.rdi; 
 	struct filde *fld = NULL;
@@ -362,53 +329,18 @@ SyS_tell (struct intr_frame *f) {
 	lock_release (&filesys_lock);
 	return ans;
 }
-static void
-deref_file_obj (struct file_obj *obj) {
-	ASSERT (obj != NULL);
-	ASSERT (obj->ref_cnt > 0);
-
-	if (--obj->ref_cnt == 0) {
-		file_close (obj->file);
-		free (obj);
-	}
-}
-
-bool
-clean_filde (struct filde *filde) {
-	if (filde) {
-		if (filde->type == FILE)
-			deref_file_obj (filde->obj);
-		free (filde);
-		return true;
-	}
-	return false;
-}
-
-static uint64_t
-__do_close (int fd) {
-	int ret = -1;
-
-	lock_acquire (&filesys_lock);
-	struct filde *filde = get_filde_by_fd (fd);
-	if (filde) {
-		list_remove (&filde->elem);
-		ret = clean_filde (filde);
-	}
-	lock_release (&filesys_lock);
-	return ret;
-}
 
 /*Funtion to handle close system call*/
 static uint64_t
-SyS_close (struct intr_frame *f) {
+syscall_close (struct intr_frame *f) {
 	int32_t fd = f->R.rdi;
-	struct filde *filde = get_filde_by_fd (fd);
+	struct filde *filde = get_filde (fd);
 	if (!filde){ 
 		// lock_release (&filesys_lock);
 		return -1; 
 	}
 	list_remove (&filde->elem);
-	if (filde -> type != FILE) {
+	if (filde -> fd < 2) {
 		free(filde); 
 		// lock_release (&filesys_lock);
 		return 1;
@@ -423,97 +355,89 @@ SyS_close (struct intr_frame *f) {
 	lock_release (&filesys_lock);
 	return 1;
 }
-static uint64_t
-SyS_dup2 (struct intr_frame *f) {
-	int32_t oldfd = f->R.rdi;
-	int32_t newfd = f->R.rsi;
-	struct filde *filde, *new_filde;
 
-	/* Fail if invalid fd */
-	if (newfd < 0) return -1;
-	filde = get_filde_by_fd (oldfd);
-	new_filde = get_filde_by_fd (newfd); 
-
-	if (!filde) return -1;
-	if (newfd == oldfd) return oldfd;
-	/* close if new_filde is avail. */
-	if (new_filde){
-		list_remove (&new_filde->elem);
-		if (new_filde->type == FILE){
-			struct file_obj *obj = new_filde -> obj; 
-			if (--obj->ref_cnt == 0) {
-				file_close (obj->file);
-				free (obj);
-			}
-		}
-		free (new_filde);
-	}
-	new_filde = (struct filde *)malloc(sizeof(struct filde));
-	if (!new_filde){
-		return -1;
-	}
-	lock_acquire(&filesys_lock);
-	*new_filde = *filde;
-	new_filde->fd = newfd;
-	if (new_filde->obj)
-		new_filde->obj->ref_cnt++;
-	list_insert_ordered(&thread_current()->fd_list, &new_filde->elem, fd_sort, NULL);
-	int ret = newfd;
-	lock_release (&filesys_lock);
-	return ret;
-}
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
+	char *fname = (char *) f->R.rdi;
 	switch (f->R.rax) {
 		case SYS_HALT:
 			power_off ();
 			NOT_REACHED ();
 			break;
 		case SYS_EXIT:
-			thread_current ()->exit_status = f->R.rdi;
+			thread_current ()-> exit_status = f->R.rdi;
 			thread_exit ();
 			NOT_REACHED ();
 			break;
 		case SYS_FORK:
-			f->R.rax = SyS_fork (f);
+			if (!pointer_validate (fname)){
+				thread_current () -> exit_status = -1;
+				thread_exit ();
+			}
+			f->R.rax = syscall_fork (f);
 			break;
 		case SYS_EXEC:
-			f->R.rax = SyS_exec (f);
+			if (!pointer_validate (f->R.rdi)){
+				thread_current() -> exit_status = -1;
+				thread_exit(); 
+			}
+			f->R.rax = syscall_exec (f);
 			break;
 		case SYS_WAIT:
 			f->R.rax = process_wait(f->R.rdi);
 			break;
 		case SYS_CREATE:
-			f->R.rax = SyS_create (f);
+			if (!pointer_validate (fname) || !strcmp (fname, "")){
+				thread_current() -> exit_status = -1;
+				thread_exit();
+			}
+			f->R.rax = syscall_create (f);
 			break;
 		case SYS_REMOVE:
-			f->R.rax = SyS_remove (f);
+			if (!pointer_validate (fname)){
+				thread_current() -> exit_status = -1;
+				thread_exit(); 
+			}
+			f->R.rax = syscall_remove (f);
 			break;
 		case SYS_OPEN:
-			f->R.rax = SyS_open (f);
+			if (!pointer_validate (fname)){
+				thread_current ()-> exit_status = -1;
+				thread_exit ();
+			}
+			f->R.rax = syscall_open (f);
 			break;
 		case SYS_FILESIZE:
-			f->R.rax = SyS_filesize (f);
+			f->R.rax = syscall_filesize (f);
 			break;
 		case SYS_READ:
-			f->R.rax = SyS_read (f);
+			if (!pointer_validate (f -> R.rsi)){
+				thread_current() -> exit_status = -1;
+				thread_exit(); 
+			}
+			f->R.rax = syscall_read (f);
 			break;
 		case SYS_WRITE:
-			f->R.rax = SyS_write (f);
+			if (!pointer_validate (f -> R.rsi)){
+				thread_current() -> exit_status = -1;
+				// printf ("%s: exit(%d)\n", thread_current() ->name, thread_current() ->exit_status);
+				thread_exit(); 
+			}
+			f->R.rax = syscall_write (f);
 			break;
 		case SYS_SEEK:
-			SyS_seek (f);
+			syscall_seek (f);
 			f->R.rax = 0;
 			break;
 		case SYS_TELL:
-			f->R.rax = SyS_tell (f);
+			f->R.rax = syscall_tell (f);
 			break;
 		case SYS_CLOSE:
-			f->R.rax = SyS_close (f);
+			f->R.rax = syscall_close (f);
 			break;
 		case SYS_DUP2:
-			f->R.rax = SyS_dup2 (f);
+			f->R.rax = -1;
 			break;
 		default:
 			printf ("Unexpected Syscall: %llx", f->R.rax);
