@@ -118,11 +118,10 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_ ) {
 	struct thread *curr = thread_current ();
 	struct fork_fd *fork_temp = calloc (1, sizeof (struct fork_fd));
-	// struct fork_fd fork_temp;
 	
 	fork_temp->parent = curr; //set thread to current thread
 
-	memcpy (&fork_temp->if_, if_, sizeof (struct intr_frame)); //copy if_ to if_
+	memcpy (&curr -> parent_if, if_, sizeof (struct intr_frame)); //copy if_ to if_
 
 	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, fork_temp);
 	if (tid != TID_ERROR){
@@ -237,7 +236,8 @@ __do_fork (void *aux_) {
 	struct thread *current = thread_current ();
 
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &aux->if_;
+	struct intr_frame *parent_if = &parent -> parent_if;
+
 	bool succ = false;
 	aux -> status.stt_exit = false;
 

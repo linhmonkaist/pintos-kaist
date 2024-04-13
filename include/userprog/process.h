@@ -19,7 +19,6 @@ struct fork_status {
 
 struct fork_fd {
     struct thread *parent;
-    struct intr_frame if_;
     char *file_name;
     struct fork_status status; // Nested structure 
     char *arguments;
