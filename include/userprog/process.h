@@ -21,7 +21,6 @@ struct fork_fd {
     struct thread *parent;
     struct intr_frame if_;
     char *file_name;
-    struct semaphore init_dial;
     struct fork_status status; // Nested structure 
     char *arguments;
     int arguments_count; 

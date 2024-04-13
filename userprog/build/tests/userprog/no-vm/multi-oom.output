@@ -641,8 +641,8 @@ child_0_O: exit(146)
 (multi-oom) should have forked at least 172 times, but 146 times forked: FAILED
 multi-oom: exit(1)
 Execution of 'multi-oom' complete.
-Timer: 702 ticks
-Thread: 37 idle ticks, 185 kernel ticks, 480 user ticks
+Timer: 664 ticks
+Thread: 37 idle ticks, 187 kernel ticks, 440 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 83 reads, 244 writes
 hd1:0: 108 reads, 0 writes

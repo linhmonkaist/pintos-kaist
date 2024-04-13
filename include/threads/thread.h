@@ -144,6 +144,7 @@ struct thread {
 	struct semaphore load_sema;
 	bool fork_succeed;
 	struct semaphore fork_sema;
+	struct semaphore init_sema; 
 
 #endif
 #ifdef VM

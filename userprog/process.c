@@ -76,7 +76,6 @@ process_create_initd (const char *file_name) {
 	aux->file_name = fn_copy;
 	aux->parent = thread_current ();
 
-	sema_init (&aux-> init_dial, 0);
 	for (char *token= strtok_r(copy_to_get_args," ", &save_ptr); token != NULL;
 	token = strtok_r(NULL, " ", &save_ptr)){
 		aux -> arguments_count ++; 
@@ -86,8 +85,10 @@ process_create_initd (const char *file_name) {
 		palloc_free_page (fn_copy);
 		palloc_free_page (copy_to_get_args); 
 	}
-	else
-		sema_down(&aux-> init_dial);
+	else{
+		struct thread *child = get_child_tid(tid);
+		sema_down(&child-> init_sema);
+	}
 	free (aux);
 	return tid;
 }
@@ -104,7 +105,7 @@ initd (void *input) {
 	process_init ();
 	thread_current() ->wait_on_exit = true;
 	thread_current() ->exit_status = -1;
-	sema_up(&aux-> init_dial); 
+	sema_up(&thread_current()-> init_sema); 
 	if (process_exec (f_name) < 0)
 		//make process run
 		PANIC("Fail to launch initd\n");
