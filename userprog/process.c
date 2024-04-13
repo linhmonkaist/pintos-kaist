@@ -188,39 +188,39 @@ struct entry {
     struct file_obj *child;
 };
 
-static struct fd_dict *new_map(struct list *l) {
-    struct fd_dict *fd_maps = malloc(sizeof(struct fd_dict));
-    if (fd_maps) {
-        fd_maps->size = list_size(l);
-        fd_maps->i = 0;
-        fd_maps->entries = malloc(sizeof(struct entry) * fd_maps->size);
-        if (!fd_maps->entries) {
-            free(fd_maps); // Ensure no memory leak if entry allocation fails
+static struct fd_dict *fd_dict_create(struct list *l) {
+    struct fd_dict *fd_dicts = malloc(sizeof(struct fd_dict));
+    if (fd_dicts) {
+        fd_dicts->size = list_size(l);
+        fd_dicts->i = 0;
+        fd_dicts->entries = malloc(sizeof(struct entry) * fd_dicts->size);
+        if (!fd_dicts->entries) {
+            free(fd_dicts); // Ensure no memory leak if entry allocation fails
             return NULL;
         }
     }
-    return fd_maps;
+    return fd_dicts;
 }
-static bool fd_map_add(struct fd_dict *fd_map, struct file_obj *p, struct file_obj *c) {
-    if (!fd_map || fd_map->i >= fd_map->size) {
+static bool fd_dict_insert(struct fd_dict *fd_dict, struct file_obj *p, struct file_obj *c) {
+    if (!fd_dict || fd_dict->i >= fd_dict->size) {
         // Log error or handle it more gracefully
         return false;
     }
-    fd_map->entries[fd_map->i++] = (struct entry){ .parent = p, .child = c };
+    fd_dict->entries[fd_dict->i++] = (struct entry){ .parent = p, .child = c };
     return true;
 }
-static struct file_obj *fd_map_lookup(struct fd_dict *fd_map, struct file_obj *f) {
-    if (!fd_map) return NULL;
-    for (int index = 0; index < fd_map->i; index++) {
-        if (fd_map->entries[index].parent == f)
-            return fd_map->entries[index].child;
+static struct file_obj *fd_dict_search(struct fd_dict *fd_dict, struct file_obj *f) {
+    if (!fd_dict) return NULL;
+    for (int index = 0; index < fd_dict->i; index++) {
+        if (fd_dict->entries[index].parent == f)
+            return fd_dict->entries[index].child;
     }
     return NULL; 
 }
 
-static void free_map(struct fd_dict *map){
-	free(map -> entries);
-	free(map);
+static void free_dict(struct fd_dict *dict){
+	free(dict -> entries);
+	free(dict);
 }
 
 /* A thread function that copies parent's execution context.
@@ -269,15 +269,15 @@ __do_fork (void *aux_) {
 	struct filde *filde;
 	struct list *fd_list = &parent->fd_list;
 
-	struct fd_dict *map = new_map (fd_list);
-	if (map == NULL)
+	struct fd_dict *dict = fd_dict_create (fd_list);
+	if (dict == NULL)
 		goto error;
 
 	for (struct list_elem *e = list_begin (fd_list); e != list_end (fd_list); e = list_next (e)) {
 		filde = list_entry (e, struct filde, elem);
 		struct filde *nfilde = (struct filde *) malloc (sizeof (struct filde));
 		if (nfilde == NULL){
-			free_map(map);
+			free_dict(dict);
 			goto error; 
 		}
 
@@ -288,7 +288,7 @@ __do_fork (void *aux_) {
 			list_push_back (&current->fd_list, &nfilde->elem);
 			continue;
 		}
-		nfile_obj = fd_map_lookup (map, filde->obj);
+		nfile_obj = fd_dict_search (dict, filde->obj);
 		if (nfile_obj){
 			nfile_obj->ref_cnt++;
 			nfilde->obj = nfile_obj;
@@ -298,16 +298,16 @@ __do_fork (void *aux_) {
 		nfile_obj = (struct file_obj *) malloc (sizeof (struct file_obj));
 		if (nfile_obj == NULL) {
 			free(nfilde);
-			free_map(map);
+			free_dict(dict);
 			goto error; 
 		}
 		nfile_obj->file = file_duplicate (filde->obj->file);
 		nfile_obj->ref_cnt = 0;
 		
-		if(!fd_map_add (map, filde->obj, nfile_obj)) {
+		if(!fd_dict_insert (dict, filde->obj, nfile_obj)) {
 			free(nfile_obj); //Viera Add
 			free (nfilde);
-			free_map(map);
+			free_dict(dict);
 			goto error; 
 		}
 		nfile_obj->ref_cnt++;
