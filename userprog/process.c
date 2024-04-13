@@ -32,15 +32,8 @@ static struct thread* get_child_tid (tid_t child_tid);
 
 /* General process initializer for initd and other process. */
 static void
-process_init (struct thread *parent, bool succ, char *args, int args_cnt) {
+process_init () {
 	struct thread *current = thread_current ();
-
-	current->wait_on_exit = succ;
-	if (succ) {
-		current->exit_status = -1;
-	}
-
-	// sema_up (sema);
 }
 
 
@@ -104,29 +97,13 @@ static void
 initd (void *input) {
 	struct fork_fd *aux = (struct fork_fd *) input;
 	char *f_name = aux->file_name;
-
-	struct thread *current = thread_current ();
-
-	// /* STDIN */
-	// struct filde *filde = (struct filde *) malloc (sizeof (struct filde));
-	// *filde = (struct filde) {
-	// 	.fd = 0,
-	// };
-	// list_push_back (&current->fd_list, &filde->elem);
-
-	// /* STDOUT */
-	// filde = (struct filde *) malloc (sizeof (struct filde));
-	// *filde = (struct filde) {
-	// 	.fd = 1,
-	// };
-
-	// list_push_back (&current->fd_list, &filde->elem);
-
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 
-	process_init (aux->parent, true, aux -> arguments, aux -> arguments_count);
+	process_init ();
+	thread_current() ->wait_on_exit = true;
+	thread_current() ->exit_status = -1;
 	sema_up(&aux-> init_dial); 
 	if (process_exec (f_name) < 0)
 		//make process run
@@ -145,11 +122,12 @@ process_fork (const char *name, struct intr_frame *if_ ) {
 	fork_temp->parent = curr; //set thread to current thread
 
 	memcpy (&fork_temp->if_, if_, sizeof (struct intr_frame)); //copy if_ to if_
-	sema_init (&fork_temp->status.dial, 0);
 
 	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, fork_temp);
 	if (tid != TID_ERROR){
-		sema_down (&fork_temp->status.dial);
+		struct thread *child = get_child_tid(tid);  //Mon add 
+		sema_down (&child-> fork_sema);
+
 	}
 	if (!fork_temp->status.succ){
 		tid = TID_ERROR;
@@ -346,8 +324,12 @@ error:
 	char *unuse;
 	int args = 0; 
 	/* Give control back to the parent */
-	process_init (parent, succ, unuse, args);
-	sema_up (&aux->status.dial);
+	process_init ();
+	thread_current() -> wait_on_exit = succ;
+	if (succ) {
+		thread_current() ->exit_status = -1;
+	}
+	sema_up (&thread_current()-> fork_sema);
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);

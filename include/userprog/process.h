@@ -12,7 +12,6 @@ void process_exit (void);
 void process_activate (struct thread *next);
 
 struct fork_status {
-    struct semaphore dial;
     bool succ;
     tid_t fork_id; 
     int stt_exit; 
