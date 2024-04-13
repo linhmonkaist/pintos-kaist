@@ -290,6 +290,20 @@ thread_create (const char *name, int priority, thread_func *function, void *aux)
 	}
 #ifdef USERPROG
 	list_push_back (&(thread_current ()->childs), &t->child_elem);
+			/* STDIN */
+		struct filde *filde = (struct filde *) malloc (sizeof (struct filde));
+		*filde = (struct filde) {
+			.fd = 0,
+		};
+		list_push_back (&t->fd_list, &filde->elem);
+
+		/* STDOUT */
+		filde = (struct filde *) malloc (sizeof (struct filde));
+		*filde = (struct filde) {
+			.fd = 1,
+		};
+
+		list_push_back (&t->fd_list, &filde->elem);
 
 #endif
 	/* Mon done. */

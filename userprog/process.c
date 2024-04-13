@@ -107,20 +107,20 @@ initd (void *input) {
 
 	struct thread *current = thread_current ();
 
-	/* STDIN */
-	struct filde *filde = (struct filde *) malloc (sizeof (struct filde));
-	*filde = (struct filde) {
-		.fd = 0,
-	};
-	list_push_back (&current->fd_list, &filde->elem);
+	// /* STDIN */
+	// struct filde *filde = (struct filde *) malloc (sizeof (struct filde));
+	// *filde = (struct filde) {
+	// 	.fd = 0,
+	// };
+	// list_push_back (&current->fd_list, &filde->elem);
 
-	/* STDOUT */
-	filde = (struct filde *) malloc (sizeof (struct filde));
-	*filde = (struct filde) {
-		.fd = 1,
-	};
+	// /* STDOUT */
+	// filde = (struct filde *) malloc (sizeof (struct filde));
+	// *filde = (struct filde) {
+	// 	.fd = 1,
+	// };
 
-	list_push_back (&current->fd_list, &filde->elem);
+	// list_push_back (&current->fd_list, &filde->elem);
 
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
