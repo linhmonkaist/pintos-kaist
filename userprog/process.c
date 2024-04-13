@@ -129,9 +129,8 @@ process_fork (const char *name, struct intr_frame *if_ ) {
 		sema_down (&child-> fork_sema);
 
 	}
-	if (!fork_temp->status.succ){
+	if (!curr -> fork_succeed){
 		tid = TID_ERROR;
-		fork_temp->status.fork_id = TID_ERROR; 
 	}
 		
 	free (fork_temp);
@@ -239,7 +238,6 @@ __do_fork (void *aux_) {
 	struct intr_frame *parent_if = &parent -> parent_if;
 
 	bool succ = false;
-	aux -> status.stt_exit = false;
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
@@ -320,8 +318,7 @@ __do_fork (void *aux_) {
 	succ = true;
 
 error:
-	// parent->fork_succeed = succ; //struct thread *parent = aux->parent;
-	aux->status.succ = succ;
+	parent->fork_succeed = succ; //struct thread *parent = aux->parent;
 	char *unuse;
 	int args = 0; 
 	/* Give control back to the parent */
