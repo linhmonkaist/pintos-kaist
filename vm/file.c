@@ -15,7 +15,7 @@ static const struct page_operations file_ops = {
 	.swap_in = file_backed_swap_in,
 	.swap_out = file_backed_swap_out,
 	.destroy = file_backed_destroy,
-	.type = VM_FILE,
+	.type = VM_FILE, // if file-backed age, invoke this operation
 };
 
 /* The initializer of file vm */
