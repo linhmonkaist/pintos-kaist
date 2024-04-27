@@ -2,7 +2,22 @@
     "files.associations": {
         "vaddr.h": "c",
         "fixed-point.h": "c",
+        "array": "c",
+        "*.tcc": "c",
+        "deque": "c",
+        "string": "c",
+        "vector": "c",
+        "functional": "c",
+        "memory_resource": "c",
         "thread.h": "c",
-        "uninit.h": "c"
+        "process.h": "c",
+        "chrono": "c",
+        "string_view": "c",
+        "ratio": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c",
+        "istream": "c",
+        "ostream": "c"
     }
 }

@@ -50,6 +50,8 @@ struct page {
 	struct hash_elem hash_elem;
 
 	bool writable; // to make the file writable
+	/* project3 */
+	int mapped_page_count;  
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -87,10 +89,10 @@ struct page_operations {
 
 /* Representation of current process's memory space.
  * We don't want to force you to obey any specific design for this struct.
- * All designs up to you for this. */
+ * All designs up to you for this. 
+ * For project3 */
 struct supplemental_page_table {
-	/* We will use a hash table data structure for this spt*/
-	struct hash spt_hash;
+	struct hash spt_hash; 
 };
 
 #include "threads/thread.h"
