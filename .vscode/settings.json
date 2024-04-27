@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "vaddr.h": "c",
-        "fixed-point.h": "c"
+        "fixed-point.h": "c",
+        "thread.h": "c",
+        "uninit.h": "c"
     }
 }

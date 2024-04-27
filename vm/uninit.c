@@ -22,7 +22,7 @@ static const struct page_operations uninit_ops = {
 	.type = VM_UNINIT,
 };
 
-/* DO NOT MODIFY this function */
+/* DO NOT MODIFY this function, makes page structure received as parameter to uninit type */
 void
 uninit_new (struct page *page, void *va, vm_initializer *init,
 		enum vm_type type, void *aux,
@@ -30,14 +30,14 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 	ASSERT (page != NULL);
 
 	*page = (struct page) {
-		.operations = &uninit_ops,
+		.operations = &uninit_ops, // when page loaded .swap_in is called
 		.va = va,
 		.frame = NULL, /* no frame for now */
 		.uninit = (struct uninit_page) {
-			.init = init,
+			.init = init, // lazy load
 			.type = type,
 			.aux = aux,
-			.page_initializer = initializer,
+			.page_initializer = initializer, // can be anon or file_backed, called in swap_in of vm_do_claim_page
 		}
 	};
 }
