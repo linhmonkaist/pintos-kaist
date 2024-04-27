@@ -18,4 +18,13 @@ struct fork_fd {
     int arguments_count; 
 };
 
+#ifdef VM
+struct lazy_load_arg{
+    struct file *file; 
+    off_t ofs; 
+    size_t read_bytes;
+    size_t zero_bytes;
+};
+#endif
+
 #endif /* userprog/process.h */

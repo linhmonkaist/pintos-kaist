@@ -3,6 +3,8 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "threads/vaddr.h"
+#include "threads/mmu.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -121,6 +123,7 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), 1); 
 }
 
 /* Handle the fault on write_protected page */
@@ -136,8 +139,25 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
+	//check addr
+	if (addr == NULL || is_kernel_vaddr(addr)) return false; 
+	if (!not_present) return false; 
+	if (not_present){
+		void *rsp = f -> rsp;
+		//if kernel access
+		if (!user) rsp = thread_current() -> rsp; 
 
-	return vm_do_claim_page (page);
+		//if rsp in USER_STACK - 1MB to USER_STACK and address need to access have to point out to current stack pointer and in the range of stack memory
+		if (USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK) 
+			vm_stack_growth(addr); 
+		else if (USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK)
+			vm_stack_growth(addr);
+		
+		page = spt_find_page(spt, addr);
+		if (page == NULL || (write == 1 && page -> writable == 0))
+			return false; 
+		return vm_do_claim_page (page);
+	}
 }
 
 /* Free the page.
@@ -180,6 +200,23 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
+	{	
+		if (type == VM_FILE){
+			struct lazy_load_arg *file_aux = malloc(sizeof(lazy_load_arg));
+			file_aux -> file = src_page -> file.file; 
+			file_aux -> ofs = src_page -> file.ofs; 
+			file_aux->read_bytes = src_page->file.read_bytes;
+			file_aux->zero_bytes = src_page->file.zero_bytes;
+			bool vm_init = vm_alloc_page_with_initializer(type, upage, writable, NULL, file_aux);
+			if (!vm_init) return false; 
+			struct page *file_page = spt_find_page(dst, upage);
+			file_backed_initializer(file_page, type, NULL); 
+			file_page -> frame = src_page -> frame; 
+			pml4_set_page(thread_current() -> pml4, file_page -> va, src_page -> frame -> kva, src_page -> writable);
+			continue;
+		}
+	}
+	return true; 
 }
 
 /* Free the resource hold by the supplemental page table */
