@@ -5,6 +5,7 @@
 #include "vm/inspect.h"
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
+#include "userprog/process.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -309,7 +310,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 
 		/* For type FILE*/
 		if (type == VM_FILE){
-			struct lazy_load_arg *file_aux = malloc(sizeof(lazy_load_arg));
+			struct lazy_load_arg *file_aux = malloc(sizeof(struct lazy_load_arg));
 			file_aux -> file = src_page -> file.file; 
 			file_aux -> ofs = src_page -> file.ofs; 
 			file_aux->read_bytes = src_page->file.read_bytes;
@@ -326,6 +327,13 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 	return true; 
 }
 
+void hash_page_destroy(struct hash_elem *e, void *aux)
+{
+    struct page *page = hash_entry(e, struct page, hash_elem);
+    destroy(page);
+    free(page);
+}
+
 /* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
@@ -335,9 +343,4 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	hash_clear(&spt->spt_hash, hash_page_destroy);
 }
 
-void hash_page_destroy(struct hash_elem *e, void *aux)
-{
-    struct page *page = hash_entry(e, struct page, hash_elem);
-    destroy(page);
-    free(page);
-}
+

@@ -361,6 +361,16 @@ syscall_close (struct intr_frame *f) {
 }
 /*function to verify address of mmap before pass to do_mmap
 for project3*/
+static struct file * process_get_file(int fd) {
+	struct list_elem *e;
+	for (e = list_begin(&thread_current()->fd_list);
+		e != list_end(&thread_current()->fd_list); e=list_next(e)) {
+		if (fd == list_entry(e, struct fd_list_elem, elem)->fd)
+			return list_entry(e, struct fd_list_elem, elem)->file_ptr;
+	}
+	return NULL;
+}
+
 static uint64_t mmap(void *addr, size_t length, int writeable, int fd, off_t offset){
 	if (addr == NULL) return NULL; 	//address not present
 	if (addr != pg_round_down(addr) || offset != pg_round_down(offset)) return NULL; //addr or offset not page-aligned

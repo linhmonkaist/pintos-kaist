@@ -60,6 +60,31 @@ file_backed_destroy (struct page *page) {
 	pml4_clear_page(thread_current() -> pml4, page -> va); 
 }
 
+static bool
+lazy_load_segment_file (struct page *page, void *aux) {
+	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *)aux;
+	
+	struct file *file = lazy_load_arg->file;
+	off_t ofs = lazy_load_arg->ofs;
+	size_t zero_bytes = lazy_load_arg->zero_bytes;
+	size_t read_bytes = lazy_load_arg->read_bytes;
+
+	/* Set file position as ofs */
+	file_seek(file, ofs);
+
+	/* Read file in physical frame as read_bytes */
+	if (file_read(file, page->frame->kva, read_bytes) != (int)(read_bytes))
+	{
+		palloc_free_page(page->frame->kva);
+		return false;
+	}
+
+	/* Fill from point of last read with zero_bytes*/
+	memset(page->frame->kva + read_bytes, 0, zero_bytes);
+
+	return true;
+}
+
 /* Do the mmap */
 void *
 do_mmap (void *addr, size_t length, int writable,
@@ -82,7 +107,7 @@ do_mmap (void *addr, size_t length, int writable,
 		lazy_load_arg -> read_bytes = page_read_bytes;
 		lazy_load_arg -> zero_bytes = page_zero_bytes; 
 
-		bool vm_alloc = vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, lazy_load_arg);
+		bool vm_alloc = vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment_file, lazy_load_arg);
 
 		if (!vm_alloc) return NULL;
 		struct page *p = spt_find_page(&thread_current() -> spt, start_addr); 

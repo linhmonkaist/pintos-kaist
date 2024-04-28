@@ -39,6 +39,8 @@
         "streambuf": "c",
         "system_error": "c",
         "typeinfo": "c",
-        "cstddef": "c"
+        "cstddef": "c",
+        "vm.h": "c",
+        "syscall.h": "c"
     }
 }
