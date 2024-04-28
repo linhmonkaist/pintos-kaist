@@ -57,6 +57,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		 * TODO: should modify the field after calling the uninit_new. */
 		
 		struct page *p = (struct page *)malloc(sizeof(struct page));
+		if (!p) return false; 
 
 		/* Use a function pointer to pass the corresponding type (since C doesn't have classes or inheritance) */
 		bool (*page_initializer)(struct page *, enum vm_type, void *);
@@ -69,6 +70,9 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
         case VM_FILE:
             page_initializer = file_backed_initializer;
             break;
+		default: 
+			PANIC("Invaild vm_type");
+			return false; 
         }
 
 		/* Call the uninit_new to initialize the uninit type then make it writable 
