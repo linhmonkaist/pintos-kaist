@@ -18,6 +18,27 @@
         "type_traits": "c",
         "utility": "c",
         "istream": "c",
-        "ostream": "c"
+        "ostream": "c",
+        "atomic": "c",
+        "cmath": "c",
+        "cstdlib": "c",
+        "cwchar": "c",
+        "unordered_map": "c",
+        "exception": "c",
+        "algorithm": "c",
+        "optional": "c",
+        "memory": "c",
+        "numeric": "c",
+        "random": "c",
+        "fstream": "c",
+        "iosfwd": "c",
+        "limits": "c",
+        "new": "c",
+        "sstream": "c",
+        "stdexcept": "c",
+        "streambuf": "c",
+        "system_error": "c",
+        "typeinfo": "c",
+        "cstddef": "c"
     }
 }

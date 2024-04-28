@@ -884,6 +884,28 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+
+	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *)aux;
+	
+	struct file *file = lazy_load_arg->file;
+	off_t ofs = lazy_load_arg->ofs;
+	size_t zero_bytes = lazy_load_arg->zero_bytes;
+	size_t read_bytes = lazy_load_arg->read_bytes;
+
+	/* Set file position as ofs */
+	file_seek(file, ofs);
+
+	/* Read file in physical frame as read_bytes */
+	if (file_read(file, page->frame->kva, read_bytes) != (int)(read_bytes))
+	{
+		palloc_free_page(page->frame->kva);
+		return false;
+	}
+
+	/* Fill from point of last read with zero_bytes*/
+	memset(page->frame->kva + read_bytes, 0, zero_bytes);
+
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -903,16 +925,16 @@ lazy_load_segment (struct page *page, void *aux) {
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
-	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
-	ASSERT (pg_ofs (upage) == 0);
-	ASSERT (ofs % PGSIZE == 0);
+	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0); // Ensure that the addition results to actual page size
+	ASSERT (pg_ofs (upage) == 0); // check if it page aligned
+	ASSERT (ofs % PGSIZE == 0); // check if the ofs is aligned
 
 	while (read_bytes > 0 || zero_bytes > 0) {
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
 		 * and zero the final PAGE_ZERO_BYTES bytes. */
 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+		size_t page_zero_bytes = PGSIZE - page_read_bytes; // set up zero bytes
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		struct lazy_load_arg *aux = (struct lazy_load_arg *) malloc(sizeof(struct lazy_load_arg));
@@ -926,11 +948,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, aux))
 			return false;
+		
+		
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -946,6 +971,19 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
 
+	/* If a page is assigned to the stack_bottom */
+	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1))
+
+	/* VM_MARKER_0 means we add the stack to pinpoint stored memory page */
+	/* Set writable to True to enter value from argument_stack() */
+	
+	{
+		/* Map physical frame to assigned page */
+		success = vm_claim_page(stack_bottom);
+		if (success)
+			/* Push to rsp */
+			if_->rsp = USER_STACK;
+	}
 	return success;
 }
 #endif /* VM */
