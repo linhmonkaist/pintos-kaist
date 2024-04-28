@@ -1,2 +1,4 @@
 /userprog/build
-/root/pintos-kaist/.vscode
+.vscode
+/vm/build
+/threads/build
