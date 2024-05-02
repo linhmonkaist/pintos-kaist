@@ -3,11 +3,11 @@ Brand new pintos for Operating Systems and Lab (CS330), KAIST, by Youngjin Kwon.
 The manual is available at https://casys-kaist.github.io/pintos-kaist/.
 
 Date: 2024/05/02 11:59AM
-pass tests/userprog/args-none
-FAIL tests/userprog/args-single
-FAIL tests/userprog/args-multiple
-FAIL tests/userprog/args-many
-FAIL tests/userprog/args-dbl-space
+FAIL tests/userprog/args-none
+pass tests/userprog/args-single
+pass tests/userprog/args-multiple
+pass tests/userprog/args-many
+pass tests/userprog/args-dbl-space
 pass tests/userprog/halt
 pass tests/userprog/exit
 pass tests/userprog/create-normal
@@ -46,7 +46,7 @@ FAIL tests/userprog/fork-read
 FAIL tests/userprog/fork-close
 FAIL tests/userprog/fork-boundary
 pass tests/userprog/exec-once
-FAIL tests/userprog/exec-arg
+pass tests/userprog/exec-arg
 FAIL tests/userprog/exec-boundary
 pass tests/userprog/exec-missing
 pass tests/userprog/exec-bad-ptr
@@ -55,11 +55,11 @@ pass tests/userprog/wait-simple
 pass tests/userprog/wait-twice
 pass tests/userprog/wait-killed
 pass tests/userprog/wait-bad-pid
-FAIL tests/userprog/multi-recurse
-FAIL tests/userprog/multi-child-fd
+pass tests/userprog/multi-recurse
+pass tests/userprog/multi-child-fd
 pass tests/userprog/rox-simple
-FAIL tests/userprog/rox-child
-FAIL tests/userprog/rox-multichild
+pass tests/userprog/rox-child
+pass tests/userprog/rox-multichild
 pass tests/userprog/bad-read
 pass tests/userprog/bad-write
 pass tests/userprog/bad-read2
@@ -144,4 +144,4 @@ pass tests/threads/priority-sema
 pass tests/threads/priority-condvar
 pass tests/threads/priority-donate-chain
 FAIL tests/vm/cow/cow-simple
-54 of 141 tests failed.
+46 of 141 tests failed.

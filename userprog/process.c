@@ -366,9 +366,9 @@ process_exec (void *f_name) {
 		thread_exit ();
 	}
 	// PANIC("In process exec %s \n", file_name);
-	Mon_argument_stack(&_if, file_name);
+	// Mon_argument_stack(&_if, file_name);
 	/* Start switched process. */
-	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true) ;
+	// hex_dump(_if.rsp, if_ -> rsp, USER_STACK - if_ -> rsp, true) ; 
 	do_iret (&_if);
 	palloc_free_page (file_name);
 	NOT_REACHED ();
@@ -712,8 +712,8 @@ load ( char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	// *(file_name + strlen(file_name)) = ' ';
-	// Mon_argument_stack(if_, file_name);
+	*(file_name + strlen(file_name)) = ' ';
+	Mon_argument_stack(if_, file_name);
 	//place argument into stack
 	success = true;
 
