@@ -5,10 +5,4 @@
 
 void syscall_init (void);
 
-struct fd_list_elem {
-    int fd;
-    struct list_elem elem;
-    struct file *file_ptr;
-};
-
 #endif /* userprog/syscall.h */

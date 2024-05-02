@@ -141,12 +141,6 @@ page_fault (struct intr_frame *f) {
 	user = (f->error_code & PF_U) != 0;
 
 	//solution
-	struct thread *t = thread_current();
-	if (user == true){
-		t -> exit_status = -1;
-		thread_exit(); 
-	}
-
 
 #ifdef VM
 	/* For project 3 and later. */
@@ -154,7 +148,11 @@ page_fault (struct intr_frame *f) {
 		return;
 		
 #endif
-
+	struct thread *t = thread_current();
+	if (user == true){
+		t -> exit_status = -1;
+		thread_exit(); 
+	}
 	/* Count page faults. */
 	page_fault_cnt++;
 

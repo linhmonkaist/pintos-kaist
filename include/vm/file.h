@@ -11,6 +11,8 @@ struct file_page {
 	off_t ofs; 
 	size_t read_bytes; 
 	size_t zero_bytes; 
+	bool is_first_page;
+	int num_left_page;
 };
 
 void vm_file_init (void);

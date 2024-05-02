@@ -19,10 +19,6 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 
-//project 3
-#include "vm/file.h"
-#include "vm/vm.h"
-
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
@@ -359,45 +355,10 @@ syscall_close (struct intr_frame *f) {
 	lock_release (&filesys_lock);
 	return 1;
 }
-/*function to verify address of mmap before pass to do_mmap
-for project3*/
-static struct file * process_get_file(int fd) {
-	struct list_elem *e;
-	for (e = list_begin(&thread_current()->fd_list);
-		e != list_end(&thread_current()->fd_list); e=list_next(e)) {
-		if (fd == list_entry(e, struct fd_list_elem, elem)->fd)
-			return list_entry(e, struct fd_list_elem, elem)->file_ptr;
-	}
-	return NULL;
-}
-
-static uint64_t mmap(void *addr, size_t length, int writeable, int fd, off_t offset){
-	if (addr == NULL) return NULL; 	//address not present
-	if (addr != pg_round_down(addr) || offset != pg_round_down(offset)) return NULL; //addr or offset not page-aligned
-	if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length)) return NULL; //addr, addr + length not in user address
-	if (spt_find_page(&thread_current() -> spt, addr)) return NULL; 
-	struct file *f = process_get_file(fd); 
-	if (!f) return NULL; 
-	if (file_length(f) == 0 || (int) length <= 0) return NULL; 
-	return do_mmap(addr, length, writeable, f, offset);
-}
-
-/* 
-* Funtion to handle syscall munmap
-* project3 */
-void munmap(void *addr){
-	do_munmap(addr); 
-}
-//end
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
-//project3
-#ifdef VM
-	thread_current() -> rsp = f -> rsp; 
-#endif
-//end
 	char *fname = (char *) f->R.rdi;
 	switch (f->R.rax) {
 		case SYS_HALT:
@@ -478,14 +439,6 @@ syscall_handler (struct intr_frame *f) {
 		case SYS_DUP2:
 			f->R.rax = -1;
 			break;
-		//project3
-		case SYS_MMAP:
-			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
-			break; 
-		case SYS_MUNMAP:
-			munmap(f -> R.rdi);
-			break; 
-		//end
 		default:
 			printf ("Unexpected Syscall: %llx", f->R.rax);
 			f->R.rax = -1;

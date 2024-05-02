@@ -6,6 +6,10 @@
 #include "threads/vaddr.h"
 #include "threads/mmu.h"
 #include "userprog/process.h"
+#include <hash.h>
+#include <string.h>
+
+struct list victim_list; //solution
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -19,6 +23,7 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	list_init(&victim_list);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -80,9 +85,14 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		ORDER MATTERS! all writings will be lost if we write before initializing */
 		uninit_new(p, upage, init, type, aux, page_initializer);
 		p->writable = writable;
+		p -> page_vm_type = type; 
 
 		/* TODO: Insert the page into the spt. */
-		return spt_insert_page(spt, p);
+		bool res = spt_insert_page(spt, p);
+		if (res){
+			p -> owner = thread_current();
+			return true; 
+		}
 	}
 err:
 	return false;
@@ -96,8 +106,8 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	page = malloc(sizeof(struct page));
     	
 	/* Find va from spt then return the page, else NULL */
-	page->va = va;
-    struct hash_elem *e = hash_find(&spt->spt_hash, &page->hash_elem);
+	page->va = pg_round_down(va);
+    struct hash_elem *e = hash_find(&thread_current() ->spt.spt_hash, &page->hash_elem);
 
 	return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
 	// return page;
@@ -125,7 +135,7 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
-
+	
 	return victim;
 }
 
@@ -151,8 +161,7 @@ vm_get_frame (void) {
 	/* Retrieve the physical page from user pool*/
 	void *kva = palloc_get_page (PAL_USER);
 
-	if (kva == NULL)   // page 할당 실패 -> 나중에 swap_out 처리
-        PANIC("todo");
+	if (kva == NULL) PANIC("todo");
 
 	// /* If kva is null, swap out*/
 	// if (kva == NULL) {
@@ -247,8 +256,9 @@ vm_do_claim_page (struct page *page) {
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
 	/* Basically setup the MMU used for mapping using pml4_set_page*/
 	struct thread *current = thread_current();
-    pml4_set_page(current->pml4, page->va, frame->kva, page->writable);
-	
+    bool set_page = pml4_set_page(current->pml4, page->va, frame->kva, page->writable);
+	if (!set_page) return false; 
+	list_push_back(&victim_list, &page->victim_list_elem);
 	return swap_in (page, frame->kva); //for uninit_initialize
 }
 
@@ -339,7 +349,6 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
-
 	hash_clear(&spt->spt_hash, hash_page_destroy);
 }
 

@@ -29,6 +29,7 @@ static bool load ( char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 static struct thread* get_child_tid (tid_t child_tid);
+static bool Mon_argument_stack(struct intr_frame *if_, char *file_name);
 
 /* General process initializer for initd and other process. */
 static void
@@ -355,18 +356,21 @@ process_exec (void *f_name) {
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
-
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
+	
 	if (!success) {
 		thread_current ()->exit_status = -1;
 		thread_exit ();
 	}
+	// PANIC("In process exec %s \n", file_name);
+	Mon_argument_stack(&_if, file_name);
 	/* Start switched process. */
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true) ;
 	do_iret (&_if);
+	palloc_free_page (file_name);
 	NOT_REACHED ();
 }
 
@@ -600,7 +604,6 @@ static bool Mon_argument_stack(struct intr_frame *if_, char *file_name){
 	// *(uint64_t *) if_ -> rsp = (uint64_t) arg_count; 
 	if_ -> rsp -= sizeof(uint64_t);
 	*(uint64_t *) if_ -> rsp = (uint64_t) 0;
-
 	return true; 
 }
 
@@ -700,7 +703,6 @@ load ( char *file_name, struct intr_frame *if_) {
 				break;
 		}
 	}
-
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
@@ -710,8 +712,8 @@ load ( char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	*(file_name + strlen(file_name)) = ' ';
-	Mon_argument_stack(if_, file_name);
+	// *(file_name + strlen(file_name)) = ' ';
+	// Mon_argument_stack(if_, file_name);
 	//place argument into stack
 	success = true;
 
@@ -884,7 +886,6 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
-
 	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *)aux;
 	
 	struct file *file = lazy_load_arg->file;
@@ -949,13 +950,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 					writable, lazy_load_segment, aux))
 			return false;
 		
-		
-
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
-		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -970,20 +968,24 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-
-	/* If a page is assigned to the stack_bottom */
-	if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1))
-
-	/* VM_MARKER_0 means we add the stack to pinpoint stored memory page */
-	/* Set writable to True to enter value from argument_stack() */
-	
-	{
-		/* Map physical frame to assigned page */
-		success = vm_claim_page(stack_bottom);
-		if (success)
-			/* Push to rsp */
-			if_->rsp = USER_STACK;
+	bool alloc_succ = vm_alloc_page(VM_ANON|VM_MARKER_0, stack_bottom, true);
+	//  
+	if (!alloc_succ) {
+		struct page *fail_page = spt_find_page(&thread_current()->spt, stack_bottom);
+		palloc_free_page(fail_page);
+		return false;
 	}
+
+	bool claim_succ = vm_claim_page(stack_bottom);
+	if (!claim_succ){
+		struct page *fail_page = spt_find_page(&thread_current()->spt, stack_bottom);
+		palloc_free_page(fail_page);
+		return false;
+	}
+
+	memset(stack_bottom, 0, PGSIZE);
+	success = true;
+	if_->rsp = USER_STACK;
 	return success;
 }
 #endif /* VM */

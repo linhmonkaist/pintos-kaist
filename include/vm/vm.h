@@ -48,10 +48,13 @@ struct page {
 
 	/* Your implementation */
 	struct hash_elem hash_elem;
-
+	enum vm_type page_vm_type; 
 	bool writable; // to make the file writable
+	struct thread *owner;
+	struct list_elem victim_list_elem; 
 	/* project3 */
-	int mapped_page_count;  
+	int mapped_page_count;
+
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
