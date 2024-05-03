@@ -2,8 +2,8 @@ Brand new pintos for Operating Systems and Lab (CS330), KAIST, by Youngjin Kwon.
 
 The manual is available at https://casys-kaist.github.io/pintos-kaist/.
 
-Date: 2024/05/02 11:59AM
-FAIL tests/userprog/args-none
+Date: 2024/05/03 10:26AM
+pass tests/userprog/args-none
 pass tests/userprog/args-single
 pass tests/userprog/args-multiple
 pass tests/userprog/args-many
@@ -81,32 +81,32 @@ FAIL tests/vm/page-merge-par
 FAIL tests/vm/page-merge-stk
 FAIL tests/vm/page-merge-mm
 pass tests/vm/page-shuffle
-FAIL tests/vm/mmap-read
-FAIL tests/vm/mmap-close
-FAIL tests/vm/mmap-unmap
-FAIL tests/vm/mmap-overlap
-FAIL tests/vm/mmap-twice
+pass tests/vm/mmap-read
+pass tests/vm/mmap-close
+pass tests/vm/mmap-unmap
+pass tests/vm/mmap-overlap
+pass tests/vm/mmap-twice
 FAIL tests/vm/mmap-write
-FAIL tests/vm/mmap-ro
+pass tests/vm/mmap-ro
 FAIL tests/vm/mmap-exit
-FAIL tests/vm/mmap-shuffle
-FAIL tests/vm/mmap-bad-fd
-FAIL tests/vm/mmap-clean
+pass tests/vm/mmap-shuffle
+pass tests/vm/mmap-bad-fd
+pass tests/vm/mmap-clean
 FAIL tests/vm/mmap-inherit
-FAIL tests/vm/mmap-misalign
-FAIL tests/vm/mmap-null
-FAIL tests/vm/mmap-over-code
-FAIL tests/vm/mmap-over-data
-FAIL tests/vm/mmap-over-stk
-FAIL tests/vm/mmap-remove
-FAIL tests/vm/mmap-zero
+pass tests/vm/mmap-misalign
+pass tests/vm/mmap-null
+pass tests/vm/mmap-over-code
+pass tests/vm/mmap-over-data
+pass tests/vm/mmap-over-stk
+pass tests/vm/mmap-remove
+pass tests/vm/mmap-zero
 FAIL tests/vm/mmap-bad-fd2
 FAIL tests/vm/mmap-bad-fd3
-FAIL tests/vm/mmap-zero-len
+pass tests/vm/mmap-zero-len
 FAIL tests/vm/mmap-off
-FAIL tests/vm/mmap-bad-off
-FAIL tests/vm/mmap-kernel
-FAIL tests/vm/lazy-file
+pass tests/vm/mmap-bad-off
+pass tests/vm/mmap-kernel
+pass tests/vm/lazy-file
 pass tests/vm/lazy-anon
 FAIL tests/vm/swap-file
 FAIL tests/vm/swap-anon
@@ -144,4 +144,4 @@ pass tests/threads/priority-sema
 pass tests/threads/priority-condvar
 pass tests/threads/priority-donate-chain
 FAIL tests/vm/cow/cow-simple
-46 of 141 tests failed.
+25 of 141 tests failed.
