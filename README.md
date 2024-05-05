@@ -29,7 +29,7 @@ pass tests/userprog/close-twice
 pass tests/userprog/close-bad-fd
 pass tests/userprog/read-normal
 pass tests/userprog/read-bad-ptr
-FAIL tests/userprog/read-boundary
+pass tests/userprog/read-boundary
 pass tests/userprog/read-zero
 pass tests/userprog/read-stdout
 pass tests/userprog/read-bad-fd
@@ -73,7 +73,7 @@ pass tests/vm/pt-bad-addr
 pass tests/vm/pt-bad-read
 pass tests/vm/pt-write-code
 pass tests/vm/pt-write-code2
-FAIL tests/vm/pt-grow-stk-sc
+pass tests/vm/pt-grow-stk-sc
 pass tests/vm/page-linear
 pass tests/vm/page-parallel
 FAIL tests/vm/page-merge-seq
@@ -144,4 +144,4 @@ pass tests/threads/priority-sema
 pass tests/threads/priority-condvar
 pass tests/threads/priority-donate-chain
 FAIL tests/vm/cow/cow-simple
-22 of 141 tests failed.
+20 of 141 tests failed.

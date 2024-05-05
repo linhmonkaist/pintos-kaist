@@ -458,7 +458,7 @@ syscall_handler (struct intr_frame *f) {
 			f->R.rax = syscall_filesize (f);
 			break;
 		case SYS_READ:
-			if (!pointer_validate (f -> R.rsi)){
+			if (!is_user_vaddr (f -> R.rsi)){
 				thread_current() -> exit_status = -1;
 				thread_exit(); 
 			}
