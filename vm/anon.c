@@ -2,6 +2,7 @@
 
 #include "vm/vm.h"
 #include "devices/disk.h"
+#include "threads/mmu.h"
 
 /* DO NOT MODIFY BELOW LINE */
 static struct disk *swap_disk;
@@ -36,21 +37,57 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
 	page->operations = &anon_ops;
 
-	struct anon_page *anon_page = &page->anon;
-	anon_page ->swap_table_idx = -1; 
+	page->anon.swap_table_idx = -1; 
 	return true; 
 }
 
-/* Swap in the page by read contents from the swap disk. */
+/* 
+* Swap in the page by read contents from the swap disk. 
+* Swaps in an anonymous page from the swap disk by reading the data contents from the disk to memory. 
+* The location of the data is the swap disk should have been saved in the page struct when the page was 
+* swapped out. Remember to update the swap table
+*/
 static bool
 anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
+	size_t idx = anon_page ->swap_table_idx;
+	void *addr = kva;  
+
+	ASSERT(bitmap_test(anon_args_swap.swap_table, idx) == false);
+	for (int i=0; i < SECTORS_PER_PAGE; i++){
+		disk_read(swap_disk, SECTORS_PER_PAGE * idx + i, addr);
+		addr += SECTORS_PER_PAGE; 
+	}
+	bitmap_set_multiple(anon_args_swap.swap_table, idx, 1, false); 
+ 
+	return true; 
 }
 
-/* Swap out the page by writing contents to the swap disk. */
+/* 
+* Swap out the page by writing contents to the swap disk. 
+* Swaps out an anonymous page to the swap disk by copying the contents from the memory to the disk. 
+* First, find a free swap slot in the disk using the swap table, then copy the page of data into the slot. 
+* The location of the data should be saved in the page struct. If there is no more free slot in the disk, 
+* you can panic the kernel.
+*/
 static bool
 anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
+	lock_acquire(&anon_args_swap.lock_swap);
+	size_t idx = bitmap_scan_and_flip(anon_args_swap.swap_table, 0, 1, false); 
+	lock_release(&anon_args_swap.lock_swap); 
+	if (idx == BITMAP_ERROR) 
+		PANIC("there is no empty slot left in anon_swap out \n");
+	anon_page ->swap_table_idx = idx; 
+	void *addr = page -> frame -> kva; 
+	for (int i= 0; i < SECTORS_PER_PAGE; i++){
+		disk_write(swap_disk, SECTORS_PER_PAGE * idx + i, addr);
+		addr += SECTORS_PER_PAGE; 
+	}
+
+	pml4_clear_page(thread_current() -> pml4, page -> va);
+	page -> frame = NULL; 
+	return true;
 }
 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */

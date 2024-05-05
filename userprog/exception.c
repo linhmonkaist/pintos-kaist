@@ -149,10 +149,11 @@ page_fault (struct intr_frame *f) {
 		
 #endif
 	struct thread *t = thread_current();
-	if (user == true){
+	// if (user == true){
 		t -> exit_status = -1;
+		// printf("%s: exit(%d)\n", t->name, -1); 
 		thread_exit(); 
-	}
+	// }
 	/* Count page faults. */
 	page_fault_cnt++;
 

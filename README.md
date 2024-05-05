@@ -2,7 +2,7 @@ Brand new pintos for Operating Systems and Lab (CS330), KAIST, by Youngjin Kwon.
 
 The manual is available at https://casys-kaist.github.io/pintos-kaist/.
 
-Date: 2024/05/03 10:26AM
+Date: 2024/05/05 14:12
 pass tests/userprog/args-none
 pass tests/userprog/args-single
 pass tests/userprog/args-multiple
@@ -72,7 +72,7 @@ pass tests/vm/pt-big-stk-obj
 pass tests/vm/pt-bad-addr
 pass tests/vm/pt-bad-read
 pass tests/vm/pt-write-code
-FAIL tests/vm/pt-write-code2
+pass tests/vm/pt-write-code2
 FAIL tests/vm/pt-grow-stk-sc
 pass tests/vm/page-linear
 pass tests/vm/page-parallel
@@ -100,8 +100,8 @@ pass tests/vm/mmap-over-data
 pass tests/vm/mmap-over-stk
 pass tests/vm/mmap-remove
 pass tests/vm/mmap-zero
-FAIL tests/vm/mmap-bad-fd2
-FAIL tests/vm/mmap-bad-fd3
+pass tests/vm/mmap-bad-fd2
+pass tests/vm/mmap-bad-fd3
 pass tests/vm/mmap-zero-len
 FAIL tests/vm/mmap-off
 pass tests/vm/mmap-bad-off
@@ -144,4 +144,4 @@ pass tests/threads/priority-sema
 pass tests/threads/priority-condvar
 pass tests/threads/priority-donate-chain
 FAIL tests/vm/cow/cow-simple
-25 of 141 tests failed.
+22 of 141 tests failed.

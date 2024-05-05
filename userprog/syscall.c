@@ -263,6 +263,7 @@ syscall_read (const struct intr_frame *f) {
 	struct thread *t = thread_current(); 
 	int32_t fd = f -> R.rdi; 
 	struct filde *fld =get_filde (fd);
+	struct file *file = fld -> obj -> file; 
 
 	if (!fld) return -1; 
 	// if (fld -> type == STDOUT) return -1; 
@@ -272,8 +273,21 @@ syscall_read (const struct intr_frame *f) {
 		return handle_STDIN(f); 
 	}
 
+	#ifdef VM
+	if (spt_find_page(&t->spt, f->R.rsi) != NULL
+			&& spt_find_page(&t->spt, f->R.rsi)->writable == 0)
+		{
+			t -> exit_status = -1;
+			thread_exit(); 
+		}
+	#endif
+	if (file == NULL){
+		t -> exit_status = -1;
+		thread_exit(); 
+		return -1; 
+	}
 	lock_acquire (&filesys_lock);
-	int32_t ans = file_read (fld -> obj -> file, f->R.rsi, f->R.rdx); 
+	int32_t ans = file_read (file, f->R.rsi, f->R.rdx); 
 	lock_release (&filesys_lock);
 	return ans;
 }
@@ -357,6 +371,7 @@ syscall_close (struct intr_frame *f) {
 	lock_release (&filesys_lock);
 	return 1;
 }
+#ifdef VM
 /* syscall to handle mmap */
 static struct file * process_get_file(int fd) {
 	struct list_elem *e;
@@ -379,6 +394,11 @@ static uint64_t syscall_mmap(void *addr, size_t length, int writeable, int fd, o
 	return do_mmap(addr, length, writeable, f, offset);
 }
 
+/* function to handle memory un map*/
+void syscall_munmap(void *addr){
+	do_munmap(addr); 
+}
+#endif
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
@@ -470,6 +490,7 @@ syscall_handler (struct intr_frame *f) {
 			f->R.rax = syscall_mmap(f-> R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
 			break; 
 		case SYS_MUNMAP:
+			syscall_munmap(f->R.rdi); 
 			break; 
 #endif
 		default:

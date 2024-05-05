@@ -161,22 +161,19 @@ vm_get_frame (void) {
 	/* Retrieve the physical page from user pool*/
 	void *kva = palloc_get_page (PAL_USER);
 
-	if (kva == NULL) PANIC("todo");
+	// if (kva == NULL) PANIC("todo");
 
 	// /* If kva is null, swap out*/
-	// if (kva == NULL) {
-	// 	frame = vm_evict_frame ();
-	// 	kva   = palloc_get_page (PAL_USER);
-	// } else
-	// 	frame = malloc (sizeof (struct frame));
-	frame = malloc(sizeof(struct frame));
-	
+	if (kva == NULL) {
+		frame = vm_evict_frame ();
+		if (!swap_out(frame -> page)) return NULL; 
+	} else {
+		frame = (struct frame *) malloc (sizeof (struct frame));
+		ASSERT (frame != NULL);
+		// list_push_back (&frame_list, &frame->frame_elem);
+	}
 	frame->kva  = kva;
-  	frame->page = NULL;
-
-	ASSERT (frame != NULL);
-	ASSERT (frame->page == NULL);
-	// list_push_back (&frame_list, &frame->frame_elem);
+	frame->page = NULL;
 	return frame;
 }
 
@@ -200,7 +197,8 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	//check addr
-	if (addr == NULL || is_kernel_vaddr(addr)) return false; 
+	if (addr == NULL) return false; 
+	if (user && is_kernel_vaddr(addr)) return false; 
 	if (!not_present) return false; 
 	if (not_present){
 		void *rsp = f -> rsp;
@@ -247,7 +245,9 @@ vm_do_claim_page (struct page *page) {
 	bool ret, writable = page->writable;
 	struct frame *frame = vm_get_frame ();
 
-	ASSERT(frame != NULL);
+	if (frame == NULL){
+		PANIC("get null frame \n");
+	}
 
 	/* Set links */
 	frame->page = page;
