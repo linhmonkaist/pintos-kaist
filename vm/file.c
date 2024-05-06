@@ -124,13 +124,28 @@ void set_file_null(struct page *page){
 */
 static void
 file_backed_destroy (struct page *page) { 
-	struct file_page *file_page UNUSED = &page->file;
-	if (pml4_is_dirty(page -> owner -> pml4, page -> va)){
-		file_seek(file_page -> file, page -> va); 
-		file_write(file_page -> file, page -> va, file_page -> read_bytes );
-		pml4_set_dirty(page -> owner -> pml4, page -> va, 0);
-	}
+	// printf("call file destroy \n"); 
+	// struct file_page *file_page UNUSED = &page->file;
+	// if (pml4_is_dirty(page -> owner -> pml4, page -> va)){
+	// 	file_seek(file_page -> file, page -> va); 
+	// 	file_write(file_page -> file, page -> va, file_page -> read_bytes );
+	// 	// pml4_set_dirty(page -> owner -> pml4, page -> va, 0);
+	// 	printf("wwrite back file destroy \n"); 
+	// }
 	
+	// page -> writable = true; 
+	// memset(page -> va, 0, PGSIZE);
+	// hash_delete(&page -> owner -> spt.spt_hash, &page -> hash_elem);
+	// set_file_null(page); 
+	struct file_page *file_page = &page->file;
+	struct thread *t = thread_current ();
+
+	/* If the content is dirty, write back the changes into the file */
+	if (pml4_is_dirty (t->pml4, page->va)) {
+		file_write_at (file_page->file, page->frame->kva, 
+					(off_t) file_page->read_bytes, file_page->ofs);
+		pml4_set_dirty (t->pml4, page->va, 0);
+	}
 	page -> writable = true; 
 	memset(page -> va, 0, PGSIZE);
 	hash_delete(&page -> owner -> spt.spt_hash, &page -> hash_elem);
@@ -184,9 +199,16 @@ void
 do_munmap (void *addr) {
 	struct supplemental_page_table *spt = &thread_current() -> spt; 
 	struct page *p = spt_find_page(spt, addr);
+	struct file *file = p->file.file;
+	int unmap_page_cnt = p->file.num_left_page;
 	int count = p -> mapped_page_count; 
-	for (int i= 0; i < count; i++){
-		if (p) destroy(p);
+	// printf("count %d", unmap_page_cnt); 
+	for (int i= 0; i <= count; i++){
+		if (p) {
+			spt_remove_page(spt, p);
+		} else {
+			return; 
+		}
 		addr += PGSIZE;
 		p = spt_find_page(spt, addr); 
 	}
