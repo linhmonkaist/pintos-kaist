@@ -11,30 +11,6 @@ static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
 static void file_backed_destroy (struct page *page);
 
-static bool
-lazy_load_segment_file (struct page *page, void *aux) {
-	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *)aux;
-	
-	struct file *file = lazy_load_arg->file;
-	off_t ofs = lazy_load_arg->ofs;
-	size_t zero_bytes = lazy_load_arg->zero_bytes;
-	size_t read_bytes = lazy_load_arg->read_bytes;
-
-	/* Set file position as ofs */
-	file_seek(file, ofs);
-
-	/* Read file in physical frame as read_bytes */
-	if (file_read(file, page->frame->kva, read_bytes) != (int)(read_bytes))
-	{
-		palloc_free_page(page->frame->kva);
-		return false;
-	}
-
-	/* Fill from point of last read with zero_bytes*/
-	memset(page->frame->kva + read_bytes, 0, zero_bytes);
-
-	return true;
-}
 
 /* DO NOT MODIFY this struct */
 static const struct page_operations file_ops = {
@@ -63,6 +39,31 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	file_page -> zero_bytes = lazy_load_arg -> zero_bytes; 
 	file_page -> is_first_page = lazy_load_arg -> is_first_page; 
 	file_page -> num_left_page = lazy_load_arg -> num_left_page; 
+	return true; 
+}
+static bool
+lazy_load_segment_file (struct page *page, void *aux) {
+	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *)aux;
+	
+	struct file *file = lazy_load_arg->file;
+	off_t ofs = lazy_load_arg->ofs;
+	size_t zero_bytes = lazy_load_arg->zero_bytes;
+	size_t read_bytes = lazy_load_arg->read_bytes;
+
+	/* Set file position as ofs */
+	file_seek(file, ofs);
+
+	/* Read file in physical frame as read_bytes */
+	if (file_read(file, page->frame->kva, read_bytes) != (int)(read_bytes))
+	{
+		palloc_free_page(page->frame->kva);
+		return false;
+	}
+
+	/* Fill from point of last read with zero_bytes*/
+	memset(page->frame->kva + read_bytes, 0, zero_bytes);
+	free(aux); 
+	return true;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -93,6 +94,7 @@ file_backed_swap_out (struct page *page) {
 		file_write(file_page -> file, page -> va, file_page -> read_bytes);
 		pml4_set_dirty(curr_pml4, page -> va, 0);
 	}
+	palloc_free_page (page->frame->kva);
 	pml4_clear_page(curr_pml4, page -> va);
 	page -> frame = NULL; 
 

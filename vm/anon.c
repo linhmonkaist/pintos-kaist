@@ -51,14 +51,13 @@ static bool
 anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
 	size_t idx = anon_page ->swap_table_idx;
-	void *addr = kva;  
 
 	ASSERT(bitmap_test(anon_args_swap.swap_table, idx) == false);
 	for (int i=0; i < SECTORS_PER_PAGE; i++){
-		disk_read(swap_disk, SECTORS_PER_PAGE * idx + i, addr);
-		addr += SECTORS_PER_PAGE; 
+		disk_read(swap_disk, SECTORS_PER_PAGE * idx + i, kva + i * DISK_SECTOR_SIZE);
 	}
-	bitmap_set_multiple(anon_args_swap.swap_table, idx, 1, false); 
+	// bitmap_set_multiple(anon_args_swap.swap_table, idx, 1, false); 
+	bitmap_set(anon_args_swap.swap_table, idx, 0);
  
 	return true; 
 }
@@ -79,12 +78,12 @@ anon_swap_out (struct page *page) {
 	if (idx == BITMAP_ERROR) 
 		PANIC("there is no empty slot left in anon_swap out \n");
 	anon_page ->swap_table_idx = idx; 
-	void *addr = page -> frame -> kva; 
+
 	for (int i= 0; i < SECTORS_PER_PAGE; i++){
-		disk_write(swap_disk, SECTORS_PER_PAGE * idx + i, addr);
-		addr += SECTORS_PER_PAGE; 
+		disk_write(swap_disk, SECTORS_PER_PAGE * idx + i,  page -> frame -> kva + i * DISK_SECTOR_SIZE );
 	}
 
+	palloc_free_page (page->frame->kva);
 	pml4_clear_page(thread_current() -> pml4, page -> va);
 	page -> frame = NULL; 
 	return true;

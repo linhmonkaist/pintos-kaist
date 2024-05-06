@@ -135,18 +135,23 @@ static struct frame *
 vm_get_victim (void) {
 	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
-	
-	return victim;
+	struct page *victim_page = list_entry (list_pop_front (&victim_list), struct page, victim_list_elem);
+	return victim_page -> frame;
 }
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
+	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
+	if (!swap_out(victim->page)) {
+		return NULL;
+	}
 
-	return NULL;
+	victim->page = NULL;
+	return victim;
+	// return NULL;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page

@@ -2,7 +2,7 @@ Brand new pintos for Operating Systems and Lab (CS330), KAIST, by Youngjin Kwon.
 
 The manual is available at https://casys-kaist.github.io/pintos-kaist/.
 
-Date: 2024/05/05 14:12
+Date: 2024/05/06 16:59
 pass tests/userprog/args-none
 pass tests/userprog/args-single
 pass tests/userprog/args-multiple
@@ -43,14 +43,14 @@ pass tests/userprog/fork-once
 pass tests/userprog/fork-multiple
 pass tests/userprog/fork-recursive
 FAIL tests/userprog/fork-read
-FAIL tests/userprog/fork-close
-FAIL tests/userprog/fork-boundary
+pass tests/userprog/fork-close
+pass tests/userprog/fork-boundary
 pass tests/userprog/exec-once
 pass tests/userprog/exec-arg
-FAIL tests/userprog/exec-boundary
+pass tests/userprog/exec-boundary
 pass tests/userprog/exec-missing
 pass tests/userprog/exec-bad-ptr
-FAIL tests/userprog/exec-read
+pass tests/userprog/exec-read
 pass tests/userprog/wait-simple
 pass tests/userprog/wait-twice
 pass tests/userprog/wait-killed
@@ -76,7 +76,7 @@ pass tests/vm/pt-write-code2
 pass tests/vm/pt-grow-stk-sc
 pass tests/vm/page-linear
 pass tests/vm/page-parallel
-FAIL tests/vm/page-merge-seq
+pass tests/vm/page-merge-seq
 FAIL tests/vm/page-merge-par
 FAIL tests/vm/page-merge-stk
 FAIL tests/vm/page-merge-mm
@@ -111,7 +111,7 @@ pass tests/vm/lazy-anon
 FAIL tests/vm/swap-file
 FAIL tests/vm/swap-anon
 FAIL tests/vm/swap-iter
-FAIL tests/vm/swap-fork
+pass tests/vm/swap-fork
 pass tests/filesys/base/lg-create
 pass tests/filesys/base/lg-full
 pass tests/filesys/base/lg-random
@@ -122,9 +122,9 @@ pass tests/filesys/base/sm-full
 pass tests/filesys/base/sm-random
 pass tests/filesys/base/sm-seq-block
 pass tests/filesys/base/sm-seq-random
-FAIL tests/filesys/base/syn-read
+pass tests/filesys/base/syn-read
 pass tests/filesys/base/syn-remove
-FAIL tests/filesys/base/syn-write
+pass tests/filesys/base/syn-write
 pass tests/threads/alarm-single
 pass tests/threads/alarm-multiple
 pass tests/threads/alarm-simultaneous
@@ -144,4 +144,4 @@ pass tests/threads/priority-sema
 pass tests/threads/priority-condvar
 pass tests/threads/priority-donate-chain
 FAIL tests/vm/cow/cow-simple
-20 of 141 tests failed.
+12 of 141 tests failed.
