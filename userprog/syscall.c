@@ -147,12 +147,14 @@ static uint64_t syscall_exec (struct intr_frame *f) {
 		fn_copy[strlen(fname) + 1] = 0;
 	}
 	fn_copy = strtok_r(fn_copy, " ", &unused);
+	int result = process_exec(fn_copy);
 
-	if (process_exec (fn_copy) == -1) {
+	if (result == -1) {
+		thread_current() -> exit_status = -1; 
 		thread_exit ();
 	}
-	NOT_REACHED();
-	return -1;
+	thread_current() -> exit_status = result; 
+	return result;
 }
 static uint64_t
 syscall_create (struct intr_frame *f) {
@@ -195,18 +197,21 @@ syscall_open (struct intr_frame *f) {
 
 	if (fd < 0){
 		lock_release (&filesys_lock);
+		// printf("fail cuz fd < 0 \n"); 
 		return -1;
 	}
 
 	file = filesys_open(fname);
 	if (file == NULL){
 		lock_release (&filesys_lock);
+		// printf("fail cuz file null \n");
 		return -1;
 	}
 	filde = (struct filde *) malloc (sizeof (struct filde));
 	if (filde == NULL){
 		file_close (file);
 		lock_release (&filesys_lock);
+		// printf("fail cuz filde null \n");
 		return -1;
 	}
 
@@ -214,12 +219,15 @@ syscall_open (struct intr_frame *f) {
 	if (obj == NULL){
 		free (filde);
 		lock_release (&filesys_lock);
+		// printf("fail cuz obj null \n");
+
 		return -1;
 	}
 
 	get_file_with_fd(filde, fd, obj, t, file); 
 		
 	lock_release (&filesys_lock);
+	// printf("return fd: %d \n", fd); 
 	return fd;
 }
 
@@ -352,8 +360,8 @@ syscall_close (struct intr_frame *f) {
 	int32_t fd = f->R.rdi;
 	struct filde *filde = get_filde (fd);
 	if (!filde){ 
-		// lock_release (&filesys_lock);
-		return -1; 
+		thread_current() -> exit_status = -1; 
+		thread_exit(); 
 	}
 	list_remove (&filde->elem);
 	if (filde -> fd < 2) {
@@ -417,7 +425,7 @@ syscall_handler (struct intr_frame *f) {
 			NOT_REACHED ();
 			break;
 		case SYS_FORK:
-			if (!pointer_validate (fname)){
+			if (!is_user_vaddr (fname)){
 				thread_current () -> exit_status = -1;
 				thread_exit ();
 			}
@@ -480,7 +488,7 @@ syscall_handler (struct intr_frame *f) {
 			f->R.rax = syscall_tell (f);
 			break;
 		case SYS_CLOSE:
-			f->R.rax = syscall_close (f);
+			syscall_close (f);
 			break;
 		case SYS_DUP2:
 			f->R.rax = -1;

@@ -42,7 +42,7 @@ pass tests/userprog/write-bad-fd
 pass tests/userprog/fork-once
 pass tests/userprog/fork-multiple
 pass tests/userprog/fork-recursive
-FAIL tests/userprog/fork-read
+pass tests/userprog/fork-read
 pass tests/userprog/fork-close
 pass tests/userprog/fork-boundary
 pass tests/userprog/exec-once
@@ -78,8 +78,8 @@ pass tests/vm/page-linear
 pass tests/vm/page-parallel
 pass tests/vm/page-merge-seq
 pass tests/vm/page-merge-par
-FAIL tests/vm/page-merge-stk
-FAIL tests/vm/page-merge-mm
+pass tests/vm/page-merge-stk
+pass tests/vm/page-merge-mm
 pass tests/vm/page-shuffle
 pass tests/vm/mmap-read
 pass tests/vm/mmap-close
@@ -92,7 +92,7 @@ pass tests/vm/mmap-exit
 pass tests/vm/mmap-shuffle
 pass tests/vm/mmap-bad-fd
 pass tests/vm/mmap-clean
-FAIL tests/vm/mmap-inherit
+pass tests/vm/mmap-inherit
 pass tests/vm/mmap-misalign
 pass tests/vm/mmap-null
 pass tests/vm/mmap-over-code
@@ -144,4 +144,4 @@ pass tests/threads/priority-sema
 pass tests/threads/priority-condvar
 pass tests/threads/priority-donate-chain
 FAIL tests/vm/cow/cow-simple
-8 of 141 tests failed.
+4 of 141 tests failed.

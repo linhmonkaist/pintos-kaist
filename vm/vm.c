@@ -171,7 +171,8 @@ vm_get_frame (void) {
 	// /* If kva is null, swap out*/
 	if (kva == NULL) {
 		frame = vm_evict_frame ();
-		if (!swap_out(frame -> page)) return NULL; 
+		return frame;
+		// if (!swap_out(frame -> page)) return NULL; 
 	} else {
 		frame = (struct frame *) malloc (sizeof (struct frame));
 		ASSERT (frame != NULL);
@@ -295,51 +296,108 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
-	struct hash_iterator i;
-	hash_first(&i, &src->spt_hash);
-	while (hash_next(&i))
-	{	
-		// For src_page
-        struct page *src_page = hash_entry(hash_cur(&i), struct page, hash_elem);
-        enum vm_type type = src_page->operations->type;
-        void *upage = src_page->va;
-        bool writable = src_page->writable;
+	// struct hash_iterator i;
+	// hash_first(&i, &src->spt_hash);
+	// while (hash_next(&i))
+	// {	
+	// 	// For src_page
+    //     struct page *src_page = hash_entry(hash_cur(&i), struct page, hash_elem);
+    //     enum vm_type type = src_page->operations->type;
+    //     void *upage = src_page->va;
+    //     bool writable = src_page->writable;
 
-		/* For type UNINIT*/
-		if (type == VM_UNINIT)
-        { // uninit page 생성 & 초기화
-            vm_initializer *init = src_page->uninit.init;
-            void *aux = src_page->uninit.aux;
-            vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
-            continue;
-        }
-		/* If not type uninit	*/
-		if (!vm_alloc_page(type, upage, writable)) 
-            return false;
+	// 	/* For type UNINIT*/
+	// 	if (type == VM_UNINIT)
+    //     { 
+    //         vm_initializer *init = src_page->uninit.init;
+    //         void *aux = src_page->uninit.aux;
+    //         vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+    //         continue;
+    //     }
+	// 	/* If not type uninit	*/
+	// 	if (!vm_alloc_page(type, upage, writable)) 
+    //         return false;
 
-		if (!vm_claim_page(upage))
-            return false;
+	// 	if (!vm_claim_page(upage))
+    //         return false;
 
-		struct page *dst_page = spt_find_page(dst, upage);
-        memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+	// 	struct page *dst_page = spt_find_page(dst, upage);
+    //     memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 
-		/* For type FILE*/
-		if (type == VM_FILE){
-			struct lazy_load_arg *file_aux = malloc(sizeof(struct lazy_load_arg));
-			file_aux -> file = src_page -> file.file; 
-			file_aux -> ofs = src_page -> file.ofs; 
-			file_aux->read_bytes = src_page->file.read_bytes;
-			file_aux->zero_bytes = src_page->file.zero_bytes;
-			bool vm_init = vm_alloc_page_with_initializer(type, upage, writable, NULL, file_aux);
-			if (!vm_init) return false; 
-			struct page *file_page = spt_find_page(dst, upage);
-			file_backed_initializer(file_page, type, NULL); 
-			file_page -> frame = src_page -> frame; 
-			pml4_set_page(thread_current() -> pml4, file_page -> va, src_page -> frame -> kva, src_page -> writable);
-			continue;
+	// 	/* For type FILE*/
+	// 	if (type == VM_FILE){
+	// 		struct lazy_load_arg *file_aux = malloc(sizeof(struct lazy_load_arg));
+	// 		file_aux -> file = src_page -> file.file; 
+	// 		file_aux -> ofs = src_page -> file.ofs; 
+	// 		file_aux->read_bytes = src_page->file.read_bytes;
+	// 		file_aux->zero_bytes = src_page->file.zero_bytes;
+	// 		bool vm_init = vm_alloc_page_with_initializer(type, upage, writable, NULL, file_aux);
+	// 		if (!vm_init) return false; 
+	// 		struct page *file_page = spt_find_page(dst, upage);
+	// 		file_backed_initializer(file_page, type, NULL); 
+	// 		file_page -> frame = src_page -> frame; 
+	// 		pml4_set_page(thread_current() -> pml4, file_page -> va, src_page -> frame -> kva, src_page -> writable);
+	// 		continue;
+	// 	}
+	// }
+	// return true; 
+	ASSERT(src != NULL);
+	ASSERT(dst != NULL);
+
+	struct hash_iterator iter;
+	hash_first(&iter, &src->spt_hash);
+
+	bool succ = true;
+	struct lazy_load_arg *aux= NULL;
+
+	while (hash_next(&iter) != NULL) {
+		struct page *p = hash_entry(hash_cur(&iter), struct page, hash_elem);
+		enum vm_type p_type = p->operations->type;
+
+		switch (p_type){
+			case VM_UNINIT:
+				aux = (struct lazy_load_arg *) malloc(sizeof(struct lazy_load_arg));
+
+				memcpy(aux, p->uninit.aux, sizeof(struct lazy_load_arg));
+
+				if (!vm_alloc_page_with_initializer(p->page_vm_type, p->va, p->writable, p->uninit.init, aux)) {
+					return false;
+				}
+
+				break;
+			case VM_ANON:
+				if(!vm_alloc_page(VM_ANON | VM_MARKER_0, p->va, p->writable)) {
+					return false;
+				}
+
+				if(!vm_claim_page(p->va)) {
+					return false;
+				}
+
+				struct page *child_p = spt_find_page(&thread_current()->spt, p->va);
+				memcpy(child_p->va, p->frame->kva, PGSIZE);
+				
+				break;
+			case VM_FILE:
+				aux = (struct lazy_load_arg *) malloc(sizeof(struct lazy_load_arg));
+				aux->file = p->file.file;
+				aux->is_first_page = p->file.is_first_page;
+				aux->num_left_page = p->file.num_left_page;
+				aux->ofs = p->file.ofs;
+				aux->read_bytes = p->file.read_bytes;
+				aux->zero_bytes = p->file.zero_bytes;
+
+				if(!vm_alloc_page_with_initializer(VM_FILE, p->va, p->writable, NULL, aux)){
+					return false;
+				}
+
+				break;
+			default:
+				break;
 		}
+
 	}
-	return true; 
+	return succ;
 }
 
 void hash_page_destroy(struct hash_elem *e, void *aux)

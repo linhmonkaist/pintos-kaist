@@ -83,7 +83,7 @@ anon_swap_out (struct page *page) {
 		disk_write(swap_disk, SECTORS_PER_PAGE * idx + i,  page -> frame -> kva + i * DISK_SECTOR_SIZE );
 	}
 
-	palloc_free_page (page->frame->kva);
+	// palloc_free_page (page->frame->kva);
 	pml4_clear_page(thread_current() -> pml4, page -> va);
 	page -> frame = NULL; 
 	return true;

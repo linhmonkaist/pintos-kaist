@@ -31,6 +31,8 @@ static void __do_fork (void *);
 static struct thread* get_child_tid (tid_t child_tid);
 static bool Mon_argument_stack(struct intr_frame *if_, char *file_name);
 
+extern struct lock filesys_lock;
+
 /* General process initializer for initd and other process. */
 static void
 process_init () {
@@ -358,7 +360,7 @@ process_exec (void *f_name) {
 #endif
 	/* And then load the binary */
 	success = load (file_name, &_if);
-
+	// printf("%s: load result: %d \n", thread_current () -> name, success); 
 	/* If load failed, quit. */
 	
 	if (!success) {
@@ -415,6 +417,7 @@ process_wait (tid_t child_tid UNUSED) {
 	sema_down (&child->wait_sema);
 	child_exit_status = child->exit_status;
 	sema_up (&child->cleanup_ok);
+	
 	// }
 		// return status;
 	return child_exit_status;
@@ -431,8 +434,8 @@ process_exit (void) {
 
 	/* Free the file descriptors */
 	struct list_elem *e;
-	while (!list_empty (&thread_current ()->fd_list)) {
-		e = list_pop_front (&thread_current ()->fd_list);
+	while (!list_empty (&curr->fd_list)) {
+		e = list_pop_front (&curr->fd_list);
 		struct filde *filde = list_entry (e, struct filde, elem); 
 		if (filde-> fd > 1){
 			struct file_obj *obj = filde -> obj; 
@@ -630,15 +633,17 @@ load ( char *file_name, struct intr_frame *if_) {
 
 	/* Open executable file. */
 	//care about synchronization if someone also open this file 
+	lock_acquire(&filesys_lock);
 	file = filesys_open (file_name);
 	if (file == NULL) {
+		lock_release(&filesys_lock); 
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
 
 	file_deny_write (file);
 	t->executable = file;
-
+	lock_release(&filesys_lock);
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
