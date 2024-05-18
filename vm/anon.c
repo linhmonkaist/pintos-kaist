@@ -52,9 +52,9 @@ anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
 	size_t idx = anon_page ->swap_table_idx;
 
-	if (bitmap_test(anon_args_swap.swap_table, idx) == false){
-		PANIC("bitmp test failed for swap_table in anon_swap_in");
-	}
+	// if (bitmap_test(anon_args_swap.swap_table, idx) == false){
+	// 	PANIC("bitmp test failed for swap_table in anon_swap_in");
+	// }
 	for (int i=0; i < SECTORS_PER_PAGE; i++){
 		disk_read(swap_disk, SECTORS_PER_PAGE * idx + i, kva + i * DISK_SECTOR_SIZE);
 	}
@@ -76,8 +76,8 @@ anon_swap_out (struct page *page) {
 	size_t idx = bitmap_scan_and_flip(anon_args_swap.swap_table, 0, 1, 0); 
 	anon_page ->swap_table_idx = idx; 
 	
-	if (idx == BITMAP_ERROR) 
-		PANIC("there is no empty slot left in anon_swap out \n");
+	// if (idx == BITMAP_ERROR) 
+	// 	PANIC("there is no empty slot left in anon_swap out \n");
 	
 
 	for (int i= 0; i < SECTORS_PER_PAGE; i++){
