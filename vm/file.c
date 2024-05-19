@@ -32,13 +32,13 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	page->operations = &file_ops;
 
 	struct file_page *file_page = &page->file;
-	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg *) page -> uninit.aux; 
-	file_page -> file = lazy_load_arg -> file;
-	file_page -> ofs = lazy_load_arg -> ofs; 
-	file_page -> read_bytes = lazy_load_arg -> read_bytes; 
-	file_page -> zero_bytes = lazy_load_arg -> zero_bytes; 
-	file_page -> is_first_page = lazy_load_arg -> is_first_page; 
-	file_page -> num_left_page = lazy_load_arg -> num_left_page; 
+	struct lazy_load_arg *lazy_arg = (struct lazy_load_arg *) page -> uninit.aux; 
+	file_page -> file = lazy_arg -> file;
+	file_page -> ofs = lazy_arg -> ofs; 
+	file_page -> read_bytes = lazy_arg -> read_bytes; 
+	file_page -> zero_bytes = lazy_arg -> zero_bytes; 
+	file_page -> is_first_page = lazy_arg -> is_first_page; 
+	file_page -> num_left_page = lazy_arg -> num_left_page; 
 	return true; 
 }
 
@@ -46,16 +46,16 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
-	struct lazy_load_arg *lazy_load_arg = (struct lazy_load_arg*) malloc(sizeof(struct lazy_load_arg));
+	struct lazy_load_arg *lazy_arg = (struct lazy_load_arg*) malloc(sizeof(struct lazy_load_arg));
 
-	lazy_load_arg -> file = file_page -> file;
-	lazy_load_arg -> ofs = file_page -> ofs; 
-	lazy_load_arg -> read_bytes = file_page -> read_bytes; 
-	lazy_load_arg -> zero_bytes = file_page -> zero_bytes; 
-	lazy_load_arg -> is_first_page = file_page -> is_first_page; 
-	lazy_load_arg -> num_left_page = file_page -> num_left_page;
+	lazy_arg -> file = file_page -> file;
+	lazy_arg -> ofs = file_page -> ofs; 
+	lazy_arg -> read_bytes = file_page -> read_bytes; 
+	lazy_arg -> zero_bytes = file_page -> zero_bytes; 
+	lazy_arg -> is_first_page = file_page -> is_first_page; 
+	lazy_arg -> num_left_page = file_page -> num_left_page;
 
-	return  lazy_load_segment(page, (void *) lazy_load_arg); 
+	return  lazy_load_segment(page, (void *) lazy_arg); 
 }
 
 /* Swap out the page by writeback contents to the file. */

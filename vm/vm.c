@@ -203,21 +203,23 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
+	int move = (1 << 20);
+	
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	//check addr
-	if (addr == NULL) return false; 
-	if (user && is_kernel_vaddr(addr)) return false; 
-	if (!not_present) return false; 
+	// if (addr == NULL) return false; 
+	if ((user && is_kernel_vaddr(addr)) || !not_present) return false; 
+	// if (!not_present) return false; 
 	if (not_present){
 		void *rsp = f -> rsp;
 		//if kernel access
 		if (!user) rsp = thread_current() -> rsp; 
 
 		//if rsp in USER_STACK - 1MB to USER_STACK and address need to access have to point out to current stack pointer and in the range of stack memory
-		if (USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK) 
+		if (USER_STACK - move <= rsp && rsp <= addr && addr <= USER_STACK) 
 			vm_stack_growth(addr); 
-		else if (USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK)
+		else if (USER_STACK - move <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK)
 			vm_stack_growth(addr);
 		
 		page = spt_find_page(spt, addr);
@@ -339,7 +341,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			// pml4_set_page(thread_current() -> pml4, file_page -> va, src_page -> frame -> kva, src_page -> writable);
 			continue;
 		}
-				/* If not type uninit	*/
+				/* If not type uninit (VM_ANON)	*/
 		if (!vm_alloc_page(VM_ANON | VM_MARKER_0, upage, writable)) 
             return false;
 

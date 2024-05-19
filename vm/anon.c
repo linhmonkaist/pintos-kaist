@@ -55,8 +55,15 @@ anon_swap_in (struct page *page, void *kva) {
 	// if (bitmap_test(anon_args_swap.swap_table, idx) == false){
 	// 	PANIC("bitmp test failed for swap_table in anon_swap_in");
 	// }
+
+	if (!bitmap_test(anon_args_swap.swap_table, idx)){
+		return false;
+	}
+
 	for (int i=0; i < SECTORS_PER_PAGE; i++){
+		lock_acquire(&anon_args_swap.lock_swap);
 		disk_read(swap_disk, SECTORS_PER_PAGE * idx + i, kva + i * DISK_SECTOR_SIZE);
+		lock_release(&anon_args_swap.lock_swap);
 	}
 	bitmap_set_multiple(anon_args_swap.swap_table, idx, 1, 0); 
 	return true; 
