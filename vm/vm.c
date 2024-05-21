@@ -101,13 +101,16 @@ err:
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = NULL;
-	/* TODO: Fill this function. */
-	page = malloc(sizeof(struct page));
+	// struct page *page = NULL;
+	// /* TODO: Fill this function. */
+	// page = malloc(sizeof(struct page));
     	
-	/* Find va from spt then return the page, else NULL */
-	page->va = pg_round_down(va);
-    struct hash_elem *e = hash_find(&thread_current() ->spt.spt_hash, &page->hash_elem);
+	// /* Find va from spt then return the page, else NULL */
+	// page->va = pg_round_down(va);
+	struct page page;
+
+	page.va = pg_round_down(va);
+    struct hash_elem *e = hash_find(&thread_current() ->spt.spt_hash, &page.hash_elem);
 
 	return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
 	// return page;
@@ -171,7 +174,8 @@ vm_get_frame (void) {
 	// /* If kva is null, swap out*/
 	if (kva == NULL) {
 		frame = vm_evict_frame ();
-		if (!swap_out(frame -> page)) return NULL; 
+		return frame;
+		// if (!swap_out(frame -> page)) return NULL; 
 	} else {
 		frame = (struct frame *) malloc (sizeof (struct frame));
 		ASSERT (frame != NULL);
@@ -218,7 +222,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		
 		page = spt_find_page(spt, addr);
 		if (page == NULL || (write == 1 && page -> writable == 0))
-			return false; 
+			{	
+				return false; 
+			}
 		return vm_do_claim_page (page);
 	}
 }
@@ -307,21 +313,14 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 
 		/* For type UNINIT*/
 		if (type == VM_UNINIT)
-        { // uninit page 생성 & 초기화
+        { 
             vm_initializer *init = src_page->uninit.init;
-            void *aux = src_page->uninit.aux;
-            vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			struct lazy_load_arg *aux = (struct lazy_load_arg *) malloc(sizeof(struct lazy_load_arg));
+			memcpy(aux, src_page->uninit.aux, sizeof(struct lazy_load_arg));
+            bool res= vm_alloc_page_with_initializer(VM_ANON, upage, writable, init, aux);
+			if (!res) return false; 
             continue;
         }
-		/* If not type uninit	*/
-		if (!vm_alloc_page(type, upage, writable)) 
-            return false;
-
-		if (!vm_claim_page(upage))
-            return false;
-
-		struct page *dst_page = spt_find_page(dst, upage);
-        memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 
 		/* For type FILE*/
 		if (type == VM_FILE){
@@ -330,16 +329,27 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			file_aux -> ofs = src_page -> file.ofs; 
 			file_aux->read_bytes = src_page->file.read_bytes;
 			file_aux->zero_bytes = src_page->file.zero_bytes;
+			file_aux -> is_first_page = src_page -> file.is_first_page;
+			file_aux -> num_left_page = src_page -> file.num_left_page;
 			bool vm_init = vm_alloc_page_with_initializer(type, upage, writable, NULL, file_aux);
 			if (!vm_init) return false; 
-			struct page *file_page = spt_find_page(dst, upage);
-			file_backed_initializer(file_page, type, NULL); 
-			file_page -> frame = src_page -> frame; 
-			pml4_set_page(thread_current() -> pml4, file_page -> va, src_page -> frame -> kva, src_page -> writable);
+			// struct page *file_page = spt_find_page(dst, upage);
+			// file_backed_initializer(file_page, type, NULL); 
+			// file_page -> frame = src_page -> frame; 
+			// pml4_set_page(thread_current() -> pml4, file_page -> va, src_page -> frame -> kva, src_page -> writable);
 			continue;
 		}
+				/* If not type uninit	*/
+		if (!vm_alloc_page(VM_ANON | VM_MARKER_0, upage, writable)) 
+            return false;
+
+		if (!vm_claim_page(upage))
+            return false;
+
+		struct page *dst_page = spt_find_page(dst, upage);
+        memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 	}
-	return true; 
+	return true;
 }
 
 void hash_page_destroy(struct hash_elem *e, void *aux)

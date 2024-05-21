@@ -37,7 +37,7 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
 	page->operations = &anon_ops;
 
-	page->anon.swap_table_idx = -1; 
+	page->anon.swap_table_idx = BITMAP_ERROR; 
 	return true; 
 }
 
@@ -52,13 +52,13 @@ anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
 	size_t idx = anon_page ->swap_table_idx;
 
-	ASSERT(bitmap_test(anon_args_swap.swap_table, idx) == false);
+	// if (bitmap_test(anon_args_swap.swap_table, idx) == false){
+	// 	PANIC("bitmp test failed for swap_table in anon_swap_in");
+	// }
 	for (int i=0; i < SECTORS_PER_PAGE; i++){
 		disk_read(swap_disk, SECTORS_PER_PAGE * idx + i, kva + i * DISK_SECTOR_SIZE);
 	}
-	// bitmap_set_multiple(anon_args_swap.swap_table, idx, 1, false); 
-	bitmap_set(anon_args_swap.swap_table, idx, 0);
- 
+	bitmap_set_multiple(anon_args_swap.swap_table, idx, 1, 0); 
 	return true; 
 }
 
@@ -73,19 +73,21 @@ static bool
 anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
 	lock_acquire(&anon_args_swap.lock_swap);
-	size_t idx = bitmap_scan_and_flip(anon_args_swap.swap_table, 0, 1, false); 
-	lock_release(&anon_args_swap.lock_swap); 
-	if (idx == BITMAP_ERROR) 
-		PANIC("there is no empty slot left in anon_swap out \n");
+	size_t idx = bitmap_scan_and_flip(anon_args_swap.swap_table, 0, 1, 0); 
 	anon_page ->swap_table_idx = idx; 
+	
+	// if (idx == BITMAP_ERROR) 
+	// 	PANIC("there is no empty slot left in anon_swap out \n");
+	
 
 	for (int i= 0; i < SECTORS_PER_PAGE; i++){
 		disk_write(swap_disk, SECTORS_PER_PAGE * idx + i,  page -> frame -> kva + i * DISK_SECTOR_SIZE );
 	}
 
-	palloc_free_page (page->frame->kva);
+	// palloc_free_page (page->frame->kva);
 	pml4_clear_page(thread_current() -> pml4, page -> va);
 	page -> frame = NULL; 
+	lock_release(&anon_args_swap.lock_swap); 
 	return true;
 }
 

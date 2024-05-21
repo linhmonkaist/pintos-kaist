@@ -31,6 +31,8 @@ static void __do_fork (void *);
 static struct thread* get_child_tid (tid_t child_tid);
 static bool Mon_argument_stack(struct intr_frame *if_, char *file_name);
 
+extern struct lock filesys_lock;
+
 /* General process initializer for initd and other process. */
 static void
 process_init () {
@@ -358,7 +360,7 @@ process_exec (void *f_name) {
 #endif
 	/* And then load the binary */
 	success = load (file_name, &_if);
-
+	// printf("%s: load result: %d \n", thread_current () -> name, success); 
 	/* If load failed, quit. */
 	
 	if (!success) {
@@ -415,6 +417,7 @@ process_wait (tid_t child_tid UNUSED) {
 	sema_down (&child->wait_sema);
 	child_exit_status = child->exit_status;
 	sema_up (&child->cleanup_ok);
+	
 	// }
 		// return status;
 	return child_exit_status;
@@ -431,8 +434,8 @@ process_exit (void) {
 
 	/* Free the file descriptors */
 	struct list_elem *e;
-	while (!list_empty (&thread_current ()->fd_list)) {
-		e = list_pop_front (&thread_current ()->fd_list);
+	while (!list_empty (&curr->fd_list)) {
+		e = list_pop_front (&curr->fd_list);
 		struct filde *filde = list_entry (e, struct filde, elem); 
 		if (filde-> fd > 1){
 			struct file_obj *obj = filde -> obj; 
@@ -630,15 +633,17 @@ load ( char *file_name, struct intr_frame *if_) {
 
 	/* Open executable file. */
 	//care about synchronization if someone also open this file 
+	lock_acquire(&filesys_lock);
 	file = filesys_open (file_name);
 	if (file == NULL) {
+		lock_release(&filesys_lock); 
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
 
 	file_deny_write (file);
 	t->executable = file;
-
+	lock_release(&filesys_lock);
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
@@ -881,7 +886,7 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
+bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
@@ -897,7 +902,7 @@ lazy_load_segment (struct page *page, void *aux) {
 	file_seek(file, ofs);
 
 	/* Read file in physical frame as read_bytes */
-	if (file_read(file, page->frame->kva, read_bytes) != (int)(read_bytes))
+	if (file_read(file, page->frame->kva, read_bytes) != (read_bytes))
 	{
 		palloc_free_page(page->frame->kva);
 		return false;
@@ -946,9 +951,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		ofs += page_read_bytes; 
 		
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
-			return false;
+		bool res = vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux);
+		if (!res) return false;
 		
 		/* Advance. */
 		read_bytes -= page_read_bytes;
@@ -961,31 +965,30 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 static bool
 setup_stack (struct intr_frame *if_) {
-	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+	struct thread *cur = thread_current(); 
 	bool alloc_succ = vm_alloc_page(VM_ANON|VM_MARKER_0, stack_bottom, true);
-	//  
+
 	if (!alloc_succ) {
-		struct page *fail_page = spt_find_page(&thread_current()->spt, stack_bottom);
+		struct page *fail_page = spt_find_page(&cur->spt, stack_bottom);
 		palloc_free_page(fail_page);
 		return false;
 	}
 
 	bool claim_succ = vm_claim_page(stack_bottom);
 	if (!claim_succ){
-		struct page *fail_page = spt_find_page(&thread_current()->spt, stack_bottom);
+		struct page *fail_page = spt_find_page(&cur->spt, stack_bottom);
 		palloc_free_page(fail_page);
 		return false;
 	}
 
 	memset(stack_bottom, 0, PGSIZE);
-	success = true;
 	if_->rsp = USER_STACK;
-	return success;
+	return true;
 }
 #endif /* VM */
