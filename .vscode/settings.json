@@ -43,6 +43,11 @@
         "vm.h": "c",
         "syscall.h": "c",
         "thread": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "round.h": "c",
+        "file.h": "c",
+        "malloc.h": "c",
+        "limits.h": "c",
+        "string.h": "c"
     }
 }
