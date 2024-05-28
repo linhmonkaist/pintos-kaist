@@ -16,15 +16,38 @@ struct inode_disk {
 	disk_sector_t start;                /* First data sector. */
 	off_t length;                       /* File size in bytes. */
 	unsigned magic;                     /* Magic number. */
-	uint32_t unused[125];               /* Not used. */
+	bool isdir;							/* Check if dictionary or not -> to update to REG, DIR, SYMLINK */
+	uint32_t unused[499];               /* Not used. */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
  * bytes long. */
+/* Changes from index method to FAT table */
 static inline size_t
 bytes_to_sectors (off_t size) {
 	return DIV_ROUND_UP (size, DISK_SECTOR_SIZE);
 }
+
+// /* Added */
+// static disk_sector_t
+// byte_to_sector (const struct inode *inode, off_t pos) {
+// 	ASSERT (inode != NULL);
+// 	if (pos < inode->data.length){
+// 		#ifdef EFILESYS
+// 			cluster_t clst = sector_to_cluster(inode->data.start);
+// 			for (unsigned i = 0; i < (pos / DISK_SECTOR_SIZE); i++) {
+// 					clst = fat_get(clst);
+// 					if (clst == 0)
+// 						return -1;
+// 			}
+// 			return cluster_to_sector(clst);
+// 		#else
+// 			return inode->data.start + pos / DISK_SECTOR_SIZE;
+// 		#endif
+// 	}
+// 	else
+// 		return -1;
+// }
 
 /* In-memory inode. */
 struct inode {
@@ -59,13 +82,14 @@ inode_init (void) {
 	list_init (&open_inodes);
 }
 
+
 /* Initializes an inode with LENGTH bytes of data and
  * writes the new inode to sector SECTOR on the file system
  * disk.
  * Returns true if successful.
  * Returns false if memory or disk allocation fails. */
 bool
-inode_create (disk_sector_t sector, off_t length) {
+inode_create (disk_sector_t sector, off_t length, bool isdir) {
 	struct inode_disk *disk_inode = NULL;
 	bool success = false;
 
@@ -80,6 +104,42 @@ inode_create (disk_sector_t sector, off_t length) {
 		size_t sectors = bytes_to_sectors (length);
 		disk_inode->length = length;
 		disk_inode->magic = INODE_MAGIC;
+		
+		/* Project 4 
+		Load to FAT table and a cluster chain for file size */
+		disk_inode->isdir = isdir;
+		#ifdef EFILESYS
+		
+		cluster_t clst = sector_to_cluster(sector); 
+		cluster_t newclst = clst; // save clst in case of chaining failure
+
+		if(sectors == 0) disk_inode->start = cluster_to_sector(fat_create_chain(newclst));
+
+		for (int i = 0; i < sectors; i++){
+			newclst = fat_create_chain(newclst);
+			if (newclst == 0){ // chain 생성 실패 시 (fails to allocate a new cluster)
+				fat_remove_chain(clst, 0);
+				free(disk_inode);
+				return false;
+			}
+			if (i == 0){
+				clst = newclst;
+				disk_inode->start = cluster_to_sector(newclst); // set start point of the file
+			}
+		}
+		disk_write (filesys_disk, sector, disk_inode);
+		if (sectors > 0) {
+			static char zeros[DISK_SECTOR_SIZE];
+			for (int i = 0; i < sectors; i++){
+				ASSERT(clst != 0 || clst != EOChain);
+				disk_write (filesys_disk, cluster_to_sector(clst), zeros); // non-contiguous sectors 
+				clst = fat_get(clst); // find next cluster in FAT
+			}
+		}
+		success = true;
+		#else
+		/* End of added */
+		
 		if (free_map_allocate (sectors, &disk_inode->start)) {
 			disk_write (filesys_disk, sector, disk_inode);
 			if (sectors > 0) {
@@ -91,6 +151,7 @@ inode_create (disk_sector_t sector, off_t length) {
 			}
 			success = true; 
 		} 
+		#endif
 		free (disk_inode);
 	}
 	return success;
@@ -230,6 +291,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) {
  * less than SIZE if end of file is reached or an error occurs.
  * (Normally a write at end of file would extend the inode, but
  * growth is not yet implemented.) */
+
+/* For file growth */
 off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 		off_t offset) {
@@ -237,8 +300,57 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	off_t bytes_written = 0;
 	uint8_t *bounce = NULL;
 
+	/* Project 4 */
+	bool grow = false; // To check if file needs to be extended or not
+	uint8_t zero[DISK_SECTOR_SIZE]; // buffer for zero padding
+	/* End of addition */
+
+	/* If we can't write on file, return 0 */
 	if (inode->deny_write_cnt)
 		return 0;
+
+	/* Project 4 */
+	/* To check if enough space in inode and until offset + size */
+	disk_sector_t sector_idx = byte_to_sector (inode, offset + size);
+	/* End of addition */
+
+	/* Project 4 - File growth */
+	/* Expand file if not enough space on disk, initialize from EOF to write ends to 0 */ 
+
+	#ifdef EFILESYS
+	while (sector_idx == -1){
+		grow = true;
+		off_t inode_len = inode_length(inode); 
+		
+		// endclst: Get last sector number of file metadata
+		cluster_t endclst = sector_to_cluster(byte_to_sector(inode, inode_len - 1));
+		// Create a new cluster after endclst
+        cluster_t newclst = inode_len == 0 ? endclst : fat_create_chain(endclst);
+		if (newclst == 0){ // No extra space available
+			break; 
+		}
+
+		// Padding with 0
+		memset (zero, 0, DISK_SECTOR_SIZE);
+
+		off_t inode_ofs = inode_len % DISK_SECTOR_SIZE;
+		if(inode_ofs != 0)
+			inode->data.length += DISK_SECTOR_SIZE - inode_ofs; // round up to DISK_SECTOR_SIZE
+
+		disk_write (filesys_disk, cluster_to_sector(newclst), zero); // zero padding for new cluster
+		if (inode_ofs != 0){
+			disk_read (filesys_disk, cluster_to_sector(endclst), zero);
+			memset (zero + inode_ofs + 1 , 0, DISK_SECTOR_SIZE - inode_ofs);
+			disk_write (filesys_disk, cluster_to_sector(endclst), zero); // zero padding for current cluster
+		}
+
+		inode->data.length += DISK_SECTOR_SIZE; // update file length
+		sector_idx = byte_to_sector (inode, offset + size);
+	}
+	#endif	
+
+	sector_idx = byte_to_sector (inode, offset); // Write from offset
+	/* End of addition */
 
 	while (size > 0) {
 		/* Sector to write, starting byte offset within sector. */
