@@ -48,6 +48,8 @@
         "file.h": "c",
         "malloc.h": "c",
         "limits.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "disk.h": "c",
+        "free-map.h": "c"
     }
 }
