@@ -43,6 +43,9 @@
         "vm.h": "c",
         "syscall.h": "c",
         "thread": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "directory.h": "c",
+        "fat.h": "c",
+        "file.h": "c"
     }
 }

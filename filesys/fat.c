@@ -5,6 +5,7 @@
 #include "threads/synch.h"
 #include <stdio.h>
 #include <string.h>
+#include <bitmap.h>
 
 /* Should be less than DISK_SECTOR_SIZE */
 struct fat_boot {
@@ -153,6 +154,12 @@ fat_boot_create (void) {
 void
 fat_fs_init (void) {
 	/* TODO: Your code goes here. */
+		fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors) / (sizeof(cluster_t) * SECTORS_PER_CLUSTER);
+	// fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors) / SECTORS_PER_CLUSTER;
+	// Set starting point of DATA sector
+	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
+
+	lock_init(&fat_fs->write_lock);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -165,6 +172,30 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
+	cluster_t i = 2;
+	while (fat_get(i) != 0 && i < fat_fs->fat_length) {
+		++i;
+	}
+
+	// if FAT is full
+	if (i == fat_fs->fat_length) {	
+		return 0;
+	}
+
+	// Update FAT value
+	fat_put(i, EOChain);	
+
+	// Start a new chain
+	if (clst == 0) {	
+		return i;
+	}
+
+	while(fat_get(clst) != EOChain) {
+		clst = fat_get(clst);
+	}
+
+	fat_put(clst, i);
+	return i;
 }
 
 /* Remove the chain of clusters starting from CLST.
@@ -178,16 +209,31 @@ fat_remove_chain (cluster_t clst, cluster_t pclst) {
 void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
+	/* Updates clst with val */
+	fat_fs->fat[clst] = val;
 }
 
 /* Fetch a value in the FAT table. */
 cluster_t
 fat_get (cluster_t clst) {
 	/* TODO: Your code goes here. */
+	/* Get number of the cluster clst given */
+	return fat_fs->fat[clst];
 }
 
 /* Covert a cluster # to a sector number. */
 disk_sector_t
 cluster_to_sector (cluster_t clst) {
 	/* TODO: Your code goes here. */
+	/* return clst corresponding sector number*/
+
+	if (clst == 0)
+		return 0;
+
+	return fat_fs->data_start + clst;
+}
+
+cluster_t
+sector_to_cluster (disk_sector_t sector) {
+   return ((sector - fat_fs->data_start) / SECTORS_PER_CLUSTER) + 2;
 }

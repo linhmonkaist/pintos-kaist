@@ -7,6 +7,13 @@
 
 struct bitmap;
 
+enum inode_type {
+    I_INIT,
+    I_REG, 
+    I_DIR,
+    I_SOFT
+};
+
 void inode_init (void);
 bool inode_create (disk_sector_t, off_t);
 struct inode *inode_open (disk_sector_t);
@@ -19,5 +26,8 @@ off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
 void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
+bool inode_is_dir(const struct inode *inode);
+bool inode_is_symlink(const struct inode *inode);
+char *inode_get_sym_path(const struct inode *inode); 
 
 #endif /* filesys/inode.h */

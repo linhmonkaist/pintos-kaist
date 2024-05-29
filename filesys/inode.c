@@ -6,9 +6,11 @@
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
+#include "filesys/fat.h"
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
+#define MAX_SYM_LINK_LEN 400
 
 /* On-disk inode.
  * Must be exactly DISK_SECTOR_SIZE bytes long. */
@@ -17,6 +19,9 @@ struct inode_disk {
 	off_t length;                       /* File size in bytes. */
 	unsigned magic;                     /* Magic number. */
 	uint32_t unused[125];               /* Not used. */
+
+	enum inode_type inode_disk_type; 
+	char linked_path[MAX_SYM_LINK_LEN]; 
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -310,4 +315,17 @@ inode_allow_write (struct inode *inode) {
 off_t
 inode_length (const struct inode *inode) {
 	return inode->data.length;
+}
+
+/*Mon: Check is inode a dir or a file*/
+bool inode_is_dir(const struct inode *inode){
+	return inode -> data.inode_disk_type == I_DIR; 
+}
+
+bool inode_is_symlink(const struct inode *inode){
+	return inode -> data.inode_disk_type == I_SOFT; 
+}
+/*get real pointed path from a symbolic path*/
+char *inode_get_sym_path(const struct inode *inode){
+	return inode -> data.linked_path; 
 }

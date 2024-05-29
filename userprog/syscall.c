@@ -18,8 +18,15 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#ifdef VM
 #include "vm/file.h"
+#endif
 #include "vm/vm.h"
+
+#ifdef EFILESYS
+#include "filesys/directory.h"
+#include "filesys/inode.h"
+#endif
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -379,8 +386,7 @@ syscall_close (struct intr_frame *f) {
 	lock_release (&filesys_lock);
 	return 1;
 }
-#ifdef VM
-/* syscall to handle mmap */
+
 static struct file * process_get_file(int fd) {
 	struct list_elem *e;
 	for (e = list_begin(&thread_current()->fd_list);
@@ -390,7 +396,8 @@ static struct file * process_get_file(int fd) {
 	}
 	return NULL;
 }
-
+#ifdef VM
+/* syscall to handle mmap */
 static uint64_t syscall_mmap(void *addr, size_t length, int writeable, int fd, off_t offset){
 	if (addr == NULL) return NULL; 	//address not present
 	if (addr != pg_round_down(addr) || offset != pg_round_down(offset)) return NULL; //addr or offset not page-aligned
@@ -405,6 +412,111 @@ static uint64_t syscall_mmap(void *addr, size_t length, int writeable, int fd, o
 /* function to handle memory un map*/
 void syscall_munmap(void *addr){
 	do_munmap(addr); 
+}
+#endif
+
+#ifdef EFILESYS 
+bool syscall_chdir(const char *direction){
+	printf("input direction in change dir: %s \n", direction); 
+	if (!is_user_vaddr(direction)){
+		thread_current() -> exit_status = -1; 
+		thread_exit(); 
+	}
+	if (strlen(direction) == 0){
+		return false;
+	}
+	if (strcmp(direction, "/") == 0){
+		dir_close(thread_current() -> cur_dir); 
+		thread_current() -> cur_dir = dir_open_root();
+		return true;
+	}
+	struct dir *new_dir = get_dir_from_path(direction); 
+	if (new_dir == NULL) return false; 
+
+	dir_close(thread_current() -> cur_dir); 
+	thread_current() -> cur_dir = new_dir; 
+	printf("change dir done \n"); 
+	return true; 
+}
+
+bool syscall_mkdir(const char *new_dir){
+	printf("input direction in make dir: %s \n", new_dir); 
+	if (!is_user_vaddr(new_dir)){
+		thread_current() -> exit_status = -1; 
+		thread_exit(); 
+	}
+	if (strlen(new_dir) == 0 || strcmp(new_dir, "/") == 0){
+		return false;
+	}
+	struct dir *pasered_dir = malloc(sizeof(struct dir)); 
+	char parsered_filename[200]; 
+	bool res = parser_path_and_file(new_dir, &pasered_dir, parsered_filename); 
+	printf("parsered file name: %s \n", parsered_filename); 
+	if (res == false) {
+		printf("false in parser path and filename \n"); 
+		return false;
+	} 
+	
+	struct inode *inode = NULL; 
+	dir_lookup(pasered_dir, parsered_filename, &inode);
+	if (inode != NULL) {
+		inode_close(inode);
+		dir_close(pasered_dir);
+		free(parsered_filename);
+		return false; 
+	}
+	disk_sector_t inode_sector = cluster_to_sector(fat_create_chain(0));
+	bool res_create = dir_create(inode_sector, 0); 
+	bool res_add = dir_add(pasered_dir, parsered_filename, inode_sector);
+	if (!res_create && !res_add && inode_sector != 0)
+		fat_remove_chain(sector_to_cluster(inode_sector), 0);
+	
+	struct dir *final_new_dir = dir_open(inode_open(inode_sector));
+	dir_add(final_new_dir, ".", inode_sector);
+	dir_add(final_new_dir, "..", inode_get_inumber(dir_get_inode(pasered_dir)));
+	dir_close(final_new_dir);
+
+	dir_close(pasered_dir);
+	free(parsered_filename);
+	return res_create && res_add; 
+}
+
+bool syscall_readdir(int fd, char *name){
+	if (!is_user_vaddr(name)){
+		thread_current() -> exit_status = -1; 
+		thread_exit(); 
+	}
+	struct file *f = process_get_file(fd);
+	
+	if ( !inode_is_dir(file_get_inode(f))) return false; 
+
+	return dir_readdir((struct dir *) f, name);
+}
+
+bool syscall_isdir(int fd){
+	struct file *file = process_get_file(fd);
+	return inode_is_dir(file_get_inode(file)); 
+}
+
+int syscall_inumber(int fd){
+	struct file *file = process_get_file(fd);
+	return inode_get_inumber(file_get_inode(file));
+}
+
+int syscall_symlink(const char *target, const char *linked_path){
+	if (!is_user_vaddr(target) || !is_user_vaddr(linked_path)){
+		thread_current() -> exit_status = -1; 
+		thread_exit(); 
+	}
+	struct dir *pasered_dir = malloc(sizeof(struct dir)); 
+	char parsered_filename[200]; 
+	
+	bool res = parser_path_and_file(new_dir, &pasered_dir, parsered_filename); 
+	printf("parsered file name: %s \n", parsered_filename); 
+	if (res == false) {
+		printf("false in parser path and filename \n"); 
+		return false;
+	} 
 }
 #endif
 /* The main system call interface */
@@ -499,6 +611,17 @@ syscall_handler (struct intr_frame *f) {
 			break; 
 		case SYS_MUNMAP:
 			syscall_munmap(f->R.rdi); 
+			break; 
+#endif
+#ifdef EFILESYS
+		case SYS_CHDIR:
+			f -> R.rax = syscall_chdir(fname);
+			break; 
+		case SYS_MKDIR:
+			f -> R.rax = syscall_mkdir(fname);
+			break; 
+		case SYS_READDIR:
+			f -> R.rax = syscall_readdir(f -> R.rdi, f -> R.rsi);
 			break; 
 #endif
 		default:

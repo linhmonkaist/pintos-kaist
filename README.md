@@ -108,9 +108,9 @@ pass tests/vm/mmap-bad-off
 pass tests/vm/mmap-kernel
 pass tests/vm/lazy-file
 pass tests/vm/lazy-anon
-FAIL tests/vm/swap-file
+pass tests/vm/swap-file
 pass tests/vm/swap-anon
-FAIL tests/vm/swap-iter
+pass tests/vm/swap-iter
 pass tests/vm/swap-fork
 pass tests/filesys/base/lg-create
 pass tests/filesys/base/lg-full
@@ -144,4 +144,4 @@ pass tests/threads/priority-sema
 pass tests/threads/priority-condvar
 pass tests/threads/priority-donate-chain
 FAIL tests/vm/cow/cow-simple
-3 of 141 tests failed.
+1 of 141 tests failed.

@@ -5,12 +5,14 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
+#include "filesys/fat.h"
 
-/* A directory. */
-struct dir {
-	struct inode *inode;                /* Backing store. */
-	off_t pos;                          /* Current position. */
-};
+// /* A directory. */
+// struct dir {
+// 	struct inode *inode;                /* Backing store. */
+// 	off_t pos;                          /* Current position. */
+// };
 
 /* A single directory entry. */
 struct dir_entry {
@@ -23,7 +25,7 @@ struct dir_entry {
  * given SECTOR.  Returns true if successful, false on failure. */
 bool
 dir_create (disk_sector_t sector, size_t entry_cnt) {
-	return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+	return inode_create (sector, entry_cnt * sizeof (struct dir_entry)); //is_dir set to 1
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -213,4 +215,110 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 		}
 	}
 	return false;
+}
+
+/*get path and open it. Path can be absolute or relative*/
+struct dir *get_dir_from_path(const char *path){
+	struct dir *current_working_dir = thread_current() -> cur_dir; 
+	struct dir *new_dir = NULL; 
+
+	//check the valid of path
+	if (strlen(path) ==  0) return NULL; 
+
+	//copy path 
+	char *copy_path = malloc(strlen(path) + 1);
+	if (!copy_path) return NULL; 
+
+	memcpy(copy_path, path, strlen(path) + 1);  
+
+	//if path is absolute, open the root
+	if (copy_path[0] == '/'){
+		new_dir = dir_open_root(); 
+	} else {
+		new_dir = dir_reopen(current_working_dir); 
+	}
+
+	//go in each dir of the path and open it with new_dir
+	char *temp = NULL; 
+	char *token = strtok_r(copy_path, '/', &temp);
+	char *cur = strtok_r(NULL, '/', &temp);
+	struct inode *inode; 
+
+	while (token != NULL && cur != NULL){
+		dir_lookup(new_dir, token, &inode);
+		if (inode == NULL) goto fail_no_inode;
+		dir_close(new_dir);
+
+		if (inode_is_symlink(inode)){
+			char *pointed_path = inode_get_sym_path(inode); 
+
+			new_dir = get_dir_from_path(pointed_path); 
+			if (new_dir == NULL) PANIC("symbolic name parser error"); 
+			return new_dir; 
+		}
+		if (!inode_is_dir(inode)) goto fail_close_inode; 
+		new_dir = dir_open(inode); 
+		token = cur; 
+		cur = strtok_r(NULL, '/', &temp);
+	}
+
+	return new_dir; 
+fail_close_inode: 
+	inode_close(inode);
+fail_no_inode: 
+	free(copy_path);
+	dir_close(new_dir);
+	return NULL; 
+}
+
+/*function to get directory and file/folder in that directory based on the input directory*/
+bool parser_path_and_file(const char *input_dir, struct dir *dir, char *filename){
+	if (strlen(input_dir) == 0){
+		dir = thread_current() -> cur_dir; 
+		return true;  
+	}
+
+	char *copy_dir = calloc(1, strlen(input_dir) + 1);
+	memcpy(copy_dir, input_dir, strlen(input_dir));
+
+	struct dir *current_dir; 
+	if (input_dir[0] == '/') current_dir = dir_open_root();
+	else current_dir = thread_current() -> cur_dir; 
+
+	struct inode *inode = NULL; 
+	char *temp;
+	char *token = strtok_r(copy_dir, "/", &temp);
+	char *next_token = strtok_r(NULL, "/", &temp); 
+
+	while (token != NULL){
+		//if token current is near last -> save file name and return dir, file
+		if (next_token == NULL){
+			memcpy(filename, token, sizeof(token) + 1);
+			return true; 
+		}
+
+		//if many dir remains
+		dir_lookup(current_dir, token, inode);
+		if (inode == NULL) goto fail_no_inode; 
+		dir_close(current_dir); 
+
+		if (inode_is_symlink(inode)){
+			char *pointed_path = inode_get_sym_path(inode); 
+
+			bool res = parser_path_and_file(pointed_path, current_dir, filename); 
+			if (res = false ) PANIC("symbolic name parser error"); 
+			return true; 
+		}
+		if (!inode_is_dir(inode)) goto fail_close_inode; 
+		current_dir = dir_open(inode); 
+		token = next_token; 
+		next_token = strtok_r(NULL, "/" , &temp);
+	}
+
+fail_close_inode: 
+	inode_close(inode);
+fail_no_inode: 
+	free(copy_dir);
+	dir_close(current_dir);
+	return false; 
 }

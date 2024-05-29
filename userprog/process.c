@@ -73,6 +73,10 @@ process_create_initd (const char *file_name) {
 	}
 
 	fn_copy = strtok_r(fn_copy, " ", &unused);
+		for (char *token= strtok_r(copy_to_get_args," ", &save_ptr); token != NULL;
+	token = strtok_r(NULL, " ", &save_ptr)){
+		aux -> arguments_count ++; 
+	}
 
 	/* Create a new thread to execute FILE_NAME. */
 	
