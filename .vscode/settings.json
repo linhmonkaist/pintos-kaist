@@ -44,8 +44,12 @@
         "syscall.h": "c",
         "thread": "c",
         "*.inc": "c",
-        "directory.h": "c",
-        "fat.h": "c",
-        "file.h": "c"
+        "round.h": "c",
+        "file.h": "c",
+        "malloc.h": "c",
+        "limits.h": "c",
+        "string.h": "c",
+        "disk.h": "c",
+        "free-map.h": "c"
     }
 }

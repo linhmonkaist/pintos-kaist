@@ -154,10 +154,10 @@ fat_boot_create (void) {
 void
 fat_fs_init (void) {
 	/* TODO: Your code goes here. */
-		fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors) / (sizeof(cluster_t) * SECTORS_PER_CLUSTER);
-	// fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors) / SECTORS_PER_CLUSTER;
-	// Set starting point of DATA sector
-	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
+
+	fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors)
+						/ SECTORS_PER_CLUSTER;
+	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors + 1;
 
 	lock_init(&fat_fs->write_lock);
 }
@@ -203,21 +203,42 @@ fat_create_chain (cluster_t clst) {
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
 	/* TODO: Your code goes here. */
+	cluster_t temp, i;
+
+	ASSERT(pclst == 0 || fat_get(pclst) == clst);
+
+	if (pclst != 0)
+		fat_put(pclst, EOChain);
+
+	i = clst;
+	while (i != EOChain) {
+		temp = fat_get(i);
+		fat_put(i, 0);
+		i = temp;
+	}
 }
 
 /* Update a value in the FAT table. */
 void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
-	/* Updates clst with val */
+
+	if (clst <= 0 || clst >= fat_fs->fat_length)
+		return;
+
+	lock_acquire(&fat_fs->write_lock);
 	fat_fs->fat[clst] = val;
+	lock_release(&fat_fs->write_lock);
+
 }
 
 /* Fetch a value in the FAT table. */
 cluster_t
 fat_get (cluster_t clst) {
 	/* TODO: Your code goes here. */
-	/* Get number of the cluster clst given */
+	if (clst == 0 || clst >= fat_fs->fat_length)
+		PANIC("wrong clst");
+
 	return fat_fs->fat[clst];
 }
 
@@ -225,12 +246,10 @@ fat_get (cluster_t clst) {
 disk_sector_t
 cluster_to_sector (cluster_t clst) {
 	/* TODO: Your code goes here. */
-	/* return clst corresponding sector number*/
-
 	if (clst == 0)
 		return 0;
 
-	return fat_fs->data_start + clst;
+	return fat_fs->data_start + (clst-2) * SECTORS_PER_CLUSTER;
 }
 
 cluster_t

@@ -34,6 +34,7 @@ struct dir *
 dir_open (struct inode *inode) {
 	struct dir *dir = calloc (1, sizeof *dir);
 	if (inode != NULL && dir != NULL) {
+		ASSERT(inode_is_dir(inode));
 		dir->inode = inode;
 		dir->pos = 0;
 		return dir;
@@ -48,7 +49,11 @@ dir_open (struct inode *inode) {
  * Return true if successful, false on failure. */
 struct dir *
 dir_open_root (void) {
+	#ifdef EFILESYS
+	return dir_open(inode_open(cluster_to_sector(ROOT_DIR_CLUSTER)));
+	#else
 	return dir_open (inode_open (ROOT_DIR_SECTOR));
+	#endif
 }
 
 /* Opens and returns a new directory for the same inode as DIR.
@@ -169,7 +174,8 @@ done:
  * which occurs only if there is no file with the given NAME. */
 bool
 dir_remove (struct dir *dir, const char *name) {
-	struct dir_entry e;
+	struct dir *tar = NULL;
+	struct dir_entry e, dent;
 	struct inode *inode = NULL;
 	bool success = false;
 	off_t ofs;
@@ -185,6 +191,29 @@ dir_remove (struct dir *dir, const char *name) {
 	inode = inode_open (e.inode_sector);
 	if (inode == NULL)
 		goto done;
+
+#ifdef EFILESYS
+	/* If file is directory. */
+	if (inode_is_dir(inode)){
+		if (thread_current()->working_dir &&
+				inode == dir_get_inode(thread_current()->working_dir))
+			return false;
+
+		tar = dir_open(inode);
+		while (inode_read_at(tar->inode, &dent, sizeof(dent), tar->pos) == sizeof(dent)) {
+			tar->pos += sizeof(dent);
+			if (dent.in_use && strcmp(dent.name, ".") && strcmp(dent.name, "..")) {
+				dir_close(tar);
+				return false;
+			}
+		}
+
+		if (inode_open_cnt(inode) > 2) {
+			dir_close(tar);
+			return false;
+		}
+	}
+#endif
 
 	/* Erase directory entry. */
 	e.in_use = false;
@@ -207,10 +236,14 @@ bool
 dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 	struct dir_entry e;
 
+	if (dir->pos == 0)
+		dir->pos += sizeof(e) * 2;
+
 	while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) {
 		dir->pos += sizeof e;
 		if (e.in_use) {
 			strlcpy (name, e.name, NAME_MAX + 1);
+			ASSERT(!strcmp(e.name, ".") || strcmp(e.name, ".."));
 			return true;
 		}
 	}
