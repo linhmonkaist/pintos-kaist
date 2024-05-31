@@ -221,12 +221,12 @@ filesys_symlink(const char* target, const char* linkpath){
 	char *name_file = NULL;
 	struct dir *dir = NULL;
 	disk_sector_t inode_sector = 0;
-	int ret = -1;
+	int ret;
 
 	if (target == NULL || linkpath == NULL
 		|| strlen(target) == 0
 		|| strlen(linkpath)== 0)
-		return ret;
+		return -1;
 
 	name_file = (char *) malloc(NAME_MAX + 1);
 	if (!get_fname_from_path(linkpath, name_file))
