@@ -15,6 +15,9 @@
 #include "userprog/process.h"
 #endif
 #include "devices/timer.h"
+#ifdef EFILESYS
+#include "filesys/directory.h"
+#endif
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -126,6 +129,9 @@ thread_init (void) {
 	//Mon chua mofify
 	if (thread_mlfqs)
 		load_avg = 0;
+	#ifdef EFILESYS
+	initial_thread->working_dir = NULL;
+	#endif
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -270,6 +276,11 @@ thread_create (const char *name, int priority, thread_func *function, void *aux)
 	/* Initialize thread. */
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
+	
+	#ifdef EFILESYS
+	if(thread_current()->working_dir != NULL)
+		t->working_dir = dir_reopen(thread_current()->working_dir);
+	#endif
 
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
@@ -391,6 +402,7 @@ thread_tid (void) {
 void
 thread_exit (void) {
 	ASSERT (!intr_context ());
+	// PANIC("=============== timeout ================");
 
 #ifdef USERPROG
 	process_exit ();

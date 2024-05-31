@@ -69,34 +69,42 @@ filesys_create (const char *name, off_t initial_size) {
 	struct dir *dir = NULL;
 	disk_sector_t inode_sector = 0;
 
+	if (strlen (name) > NAME_MAX) return false;
+
 	file_name = (char *) malloc(NAME_MAX + 1);
 	if (!file_name)
 		return false;
 	// PANIC("===timeout here===");
 	if (!get_fname_from_path(name, file_name)) {
-		// Potential problem here in directory
+		// Potential problem here in directory --> check here
 		// PANIC("===timeout here===");
 		free(file_name);
 		return false;
 	}
+	// PANIC("===pass: timeout here===");
 	dir = get_dir_from_path(name);
+	// printf(dir);
+	// Didn't go here
+	// PANIC("=== HELLOOOOO timeout here===");
 
 	bool success = (dir != NULL
 			&& (inode_sector = cluster_to_sector(fat_create_chain(0)))
 			&& inode_create (inode_sector, initial_size, F_REG)
 			&& dir_add (dir, file_name, inode_sector));
 
+	// PANIC("=== HELLOOOOO timeout here===");
+
 	if (!success && inode_sector != 0)
 		fat_remove_chain(sector_to_cluster(inode_sector), 0);
-
+	// PANIC("=== passsss: HELLOOOOO timeout here===");
 	free (file_name);
 	dir_close (dir);
+	// PANIC("=== pass: HELLOOOOO timeout here===");
 	return success;
 }
 #else
 bool
 filesys_create (const char *name, off_t initial_size) {
-	// PANIC("===timeout here===") didn't go here;
 	disk_sector_t inode_sector = 0;
 	// struct dir *dir = dir_open_root ();
 	bool success = (dir_open_root () != NULL
@@ -125,30 +133,40 @@ filesys_open (const char *name) {
 	struct inode *inode = NULL;
 
 	if (strcmp(name, "/") == 0)
+		// PANIC("===get_file_name: timeout here===");
+		// printf("file name: %s\n", name);
 		return dir_open_root();
 
+	// PANIC("===get_file_name: timeout here===");
 	file_name = (char *) malloc(NAME_MAX + 1);
+	// printf("file name: %s\n", file_name);
 	if (!file_name)
 		return NULL;
 
 	if (!get_fname_from_path(name, file_name))
+		// PANIC("=== no appear - get_fname_from: timeout here===");
 		goto free;
 
 	dir = get_dir_from_path(name);
+	// PANIC("=== yes appear - get_fname_from: timeout here===");
 	if (dir == NULL)
 		goto close;
 
 	dir_lookup(dir, file_name, &inode);
+	// PANIC("=== yes appear - get_fname_from: timeout here===");
 	if (inode == NULL)
 		goto close;
 
+	// PANIC("=== yes appear - get_fname_from: timeout here===");
 	if (inode_is_symlink(inode))
 		result = filesys_open(inode_symlink_path(inode));
+		
 	else
 		result = file_open(inode);
 
 close:
 	dir_close(dir);
+// 	PANIC("=== yes appear - get_fname_from: timeout here===");
 free:
 	free(file_name);
 	return result;
@@ -156,7 +174,7 @@ free:
 #else
 struct file *
 filesys_open (const char *name) {
-	// PANIC("why are you not workingggg");
+	PANIC("why are you not workingggg");
 	struct dir *dir = dir_open_root ();
 	struct inode *inode = NULL;
 

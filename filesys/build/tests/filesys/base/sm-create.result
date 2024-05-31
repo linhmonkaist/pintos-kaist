@@ -1,9 +1,0 @@
-FAIL
-Kernel panic in run: PANIC at ../../filesys/filesys.c:67 in filesys_create(): ===timeout here===
-Call stack: 0x80042147d5 0x800421b86e 0x800421f7ec 0x80042068cc 0x8004206186
-Translation of call stack:
-0x00000080042147d5: debug_panic (lib/kernel/debug.c:32)
-0x000000800421b86e: filesys_open (filesys/filesys.c:118)
-0x000000800421f7ec: fsutil_put (filesys/fsutil.c:108)
-0x00000080042068cc: run_actions (threads/init.c:297)
-0x0000008004206186: main (threads/init.c:125)

@@ -34,7 +34,7 @@ struct dir *
 dir_open (struct inode *inode) {
 	struct dir *dir = calloc (1, sizeof *dir);
 	if (inode != NULL && dir != NULL) {
-		ASSERT(inode_is_dir(inode));
+		ASSERT(inode_is_dir(inode)); //Kernel panic here
 		dir->inode = inode;
 		dir->pos = 0;
 		return dir;
@@ -248,20 +248,24 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 	return false;
 }
 
+#ifdef EFILESYS
 /* Get the name of file from the full path and store. */
 bool
 get_fname_from_path (const char* path, char* name) {
 	char *last_slash = strrchr(path, '/');
 
-	if (last_slash) {
+	if (last_slash) { // '/' exists
 		if (strlen(last_slash) > NAME_MAX + 1)
 			return false;
-		strlcpy(name, last_slash + 1, NAME_MAX + 1);
+		strlcpy(name, last_slash + 1, NAME_MAX + 1); // copies file name after '/'
 	}
-	else {
+	else { // No '/' exist --> path name is file name a
+		// PANIC("errrorrr heereee--------");
 		if (strlen(path) > NAME_MAX + 1)
+			// PANIC("errrorrr heereee--------");
 			return false;
 		strlcpy(name, path, NAME_MAX + 1);
+		// PANIC("errrorrr heereee--------");
 	}
 	return true;
 }
@@ -277,6 +281,7 @@ get_dir_from_path (const char *__path) {
 	struct inode *inode = NULL;
 	struct dir *working_dir = thread_current()->working_dir;
 
+	// PANIC("tessstt hereee");
 	if (strlen(__path) == 0)
 		return NULL;
 
@@ -433,3 +438,4 @@ free:
 	free(new_dir_name);
 	return ret;
 }
+#endif

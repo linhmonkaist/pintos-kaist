@@ -634,7 +634,9 @@ load ( char *file_name, struct intr_frame *if_) {
 	/* Open executable file. */
 	//care about synchronization if someone also open this file 
 	lock_acquire(&filesys_lock);
+	// PANIC("=======Does it open here?==========");
 	file = filesys_open (file_name);
+	// PANIC("=======Does it open here? Problem with filesys_open==========");
 	if (file == NULL) {
 		lock_release(&filesys_lock); 
 		printf ("load: %s: open failed\n", file_name);
