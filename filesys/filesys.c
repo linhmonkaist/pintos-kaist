@@ -74,7 +74,8 @@ filesys_create (const char *name, off_t initial_size) {
 		return false;
 	// PANIC("===timeout here===");
 	if (!get_fname_from_path(name, file_name)) {
-		// PANIC("===timeout here===") didn't go here;
+		// Potential problem here in directory
+		// PANIC("===timeout here===");
 		free(file_name);
 		return false;
 	}
