@@ -7,7 +7,7 @@
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
 #include "filesys/fat.h"
-#include "filesys/fat.h"
+
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
@@ -191,6 +191,7 @@ inode_open (disk_sector_t sector) {
 /* Reopens and returns INODE. */
 struct inode *
 inode_reopen (struct inode *inode) {
+	// printf("call inode_reopen \n"); 
 	if (inode != NULL)
 		inode->open_cnt++;
 	return inode;
@@ -211,9 +212,9 @@ inode_close (struct inode *inode) {
 	if (inode == NULL)
 		return;
 
-	#ifdef EFILESYS
+	// #ifdef EFILESYS
 	disk_write (filesys_disk, inode->sector, &inode->data);
-	#endif
+	// #endif
 	/* Release resources if this was the last opener. */
 	if (--inode->open_cnt == 0) {
 		/* Remove from inode list and release lock. */
@@ -452,15 +453,8 @@ inode_symlink_path (const struct inode* inode){
 	return inode->data.symlink_path;
 }
 
-/*Mon: Check is inode a dir or a file*/
-bool inode_is_dir(const struct inode *inode){
-	return inode -> data.inode_disk_type == I_DIR; 
-}
 
-bool inode_is_symlink(const struct inode *inode){
-	return inode -> data.inode_disk_type == I_SOFT; 
-}
-/*get real pointed path from a symbolic path*/
-char *inode_get_sym_path(const struct inode *inode){
-	return inode -> data.linked_path; 
-}
+// /*get real pointed path from a symbolic path*/
+// char *inode_get_sym_path(const struct inode *inode){
+// 	return inode -> data.symlink_path; 
+// }

@@ -345,6 +345,7 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
+	// printf("call thread to exec \n");
 	char *file_name = f_name;
 	bool success;
 
@@ -358,16 +359,19 @@ process_exec (void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup ();
+	// printf("done process clean up \n"); 
 
 #ifdef VM
 	supplemental_page_table_init (&thread_current ()->spt);
 #endif
 	/* And then load the binary */
+	// printf("load not done \n"); 
 	success = load (file_name, &_if);
 	// printf("%s: load result: %d \n", thread_current () -> name, success); 
 	/* If load failed, quit. */
-	
+	// printf("load done \n"); 
 	if (!success) {
+		// printf("load fail lead to exit \n"); 
 		thread_current ()->exit_status = -1;
 		thread_exit ();
 	}
@@ -638,6 +642,7 @@ load ( char *file_name, struct intr_frame *if_) {
 	/* Open executable file. */
 	//care about synchronization if someone also open this file 
 	lock_acquire(&filesys_lock);
+	// printf("process load call filesys open with file name: %s \n", file_name); 
 	file = filesys_open (file_name);
 	if (file == NULL) {
 		lock_release(&filesys_lock); 

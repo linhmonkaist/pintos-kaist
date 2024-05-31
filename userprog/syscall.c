@@ -78,8 +78,17 @@ static bool fd_arrange (const struct list_elem *A, const struct list_elem *B, vo
 	bool ans = list_entry (A, struct filde, elem) -> fd < list_entry (B, struct filde, elem) ->fd;
 	return ans;
 }
+void check_address (void *addr) {
+	if (!is_user_vaddr(addr))
+		SyS_exit(-1);
+}
+void SyS_exit (int status) {
+	struct thread *t = thread_current();
+	t->exit_status = status;
 
-
+	printf("%s: exit(%d)\n", t->name, status); 
+	thread_exit();
+}
 /* Fuction to make file descroption*/
 static int get_new_fd(struct thread *t){
 	struct list *cur_fd_list = &t -> fd_list; 
@@ -415,110 +424,154 @@ void syscall_munmap(void *addr){
 }
 #endif
 
-#ifdef EFILESYS 
-bool syscall_chdir(const char *direction){
-	printf("input direction in change dir: %s \n", direction); 
-	if (!is_user_vaddr(direction)){
-		thread_current() -> exit_status = -1; 
-		thread_exit(); 
-	}
-	if (strlen(direction) == 0){
+#ifdef EFILESYS
+bool SyS_chdir (const char *dir) {
+	check_address(dir);
+
+	if (strlen(dir) == 0){
 		return false;
 	}
-	if (strcmp(direction, "/") == 0){
-		dir_close(thread_current() -> cur_dir); 
-		thread_current() -> cur_dir = dir_open_root();
-		return true;
-	}
-	struct dir *new_dir = get_dir_from_path(direction); 
-	if (new_dir == NULL) return false; 
 
-	dir_close(thread_current() -> cur_dir); 
-	thread_current() -> cur_dir = new_dir; 
-	printf("change dir done \n"); 
-	return true; 
+	return dir_chdir(dir);
 }
 
-bool syscall_mkdir(const char *new_dir){
-	printf("input direction in make dir: %s \n", new_dir); 
-	if (!is_user_vaddr(new_dir)){
-		thread_current() -> exit_status = -1; 
-		thread_exit(); 
-	}
-	if (strlen(new_dir) == 0 || strcmp(new_dir, "/") == 0){
-		return false;
-	}
-	struct dir *pasered_dir = malloc(sizeof(struct dir)); 
-	char parsered_filename[200]; 
-	bool res = parser_path_and_file(new_dir, &pasered_dir, parsered_filename); 
-	printf("parsered file name: %s \n", parsered_filename); 
-	if (res == false) {
-		printf("false in parser path and filename \n"); 
-		return false;
-	} 
-	
-	struct inode *inode = NULL; 
-	dir_lookup(pasered_dir, parsered_filename, &inode);
-	if (inode != NULL) {
-		inode_close(inode);
-		dir_close(pasered_dir);
-		free(parsered_filename);
-		return false; 
-	}
-	disk_sector_t inode_sector = cluster_to_sector(fat_create_chain(0));
-	bool res_create = dir_create(inode_sector, 0); 
-	bool res_add = dir_add(pasered_dir, parsered_filename, inode_sector);
-	if (!res_create && !res_add && inode_sector != 0)
-		fat_remove_chain(sector_to_cluster(inode_sector), 0);
-	
-	struct dir *final_new_dir = dir_open(inode_open(inode_sector));
-	dir_add(final_new_dir, ".", inode_sector);
-	dir_add(final_new_dir, "..", inode_get_inumber(dir_get_inode(pasered_dir)));
-	dir_close(final_new_dir);
+bool SyS_mkdir (const char *dir) {
+	check_address(dir);
 
-	dir_close(pasered_dir);
-	free(parsered_filename);
-	return res_create && res_add; 
+	return dir_mkdir(dir);
 }
 
-bool syscall_readdir(int fd, char *name){
-	if (!is_user_vaddr(name)){
-		thread_current() -> exit_status = -1; 
-		thread_exit(); 
-	}
-	struct file *f = process_get_file(fd);
-	
-	if ( !inode_is_dir(file_get_inode(f))) return false; 
+bool SyS_readdir (int fd, char *name) {
+	check_address(name);
 
-	return dir_readdir((struct dir *) f, name);
-}
-
-bool syscall_isdir(int fd){
 	struct file *file = process_get_file(fd);
-	return inode_is_dir(file_get_inode(file)); 
+	if (file_is_dir(file) == false) {
+		return false;
+	}
+	return dir_readdir((struct dir *) file, name);
 }
 
-int syscall_inumber(int fd){
+bool SyS_isdir (int fd) {
+	struct file *file = process_get_file(fd);
+	return file_is_dir(file);
+}
+
+int SyS_inumber (int fd) {
 	struct file *file = process_get_file(fd);
 	return inode_get_inumber(file_get_inode(file));
 }
 
-int syscall_symlink(const char *target, const char *linked_path){
-	if (!is_user_vaddr(target) || !is_user_vaddr(linked_path)){
-		thread_current() -> exit_status = -1; 
-		thread_exit(); 
-	}
-	struct dir *pasered_dir = malloc(sizeof(struct dir)); 
-	char parsered_filename[200]; 
-	
-	bool res = parser_path_and_file(new_dir, &pasered_dir, parsered_filename); 
-	printf("parsered file name: %s \n", parsered_filename); 
-	if (res == false) {
-		printf("false in parser path and filename \n"); 
-		return false;
-	} 
+int SyS_symlink (const char *target, const char *linkpath) {
+	check_address(target);
+	check_address(linkpath);
+
+	return filesys_symlink(target, linkpath);
 }
 #endif
+// #ifdef EFILESYS 
+// bool syscall_chdir(const char *direction){
+// 	printf("input direction in change dir: %s \n", direction); 
+// 	if (!is_user_vaddr(direction)){
+// 		thread_current() -> exit_status = -1; 
+// 		thread_exit(); 
+// 	}
+// 	if (strlen(direction) == 0){
+// 		return false;
+// 	}
+// 	if (strcmp(direction, "/") == 0){
+// 		dir_close(thread_current() -> working_dir); 
+// 		thread_current() -> working_dir = dir_open_root();
+// 		return true;
+// 	}
+// 	struct dir *new_dir = get_dir_from_path(direction); 
+// 	if (new_dir == NULL) return false; 
+
+// 	dir_close(thread_current() -> working_dir); 
+// 	thread_current() -> working_dir = new_dir; 
+// 	printf("change dir done \n"); 
+// 	return true; 
+// }
+
+// bool syscall_mkdir(const char *new_dir){
+// 	printf("input direction in make dir: %s \n", new_dir); 
+// 	if (!is_user_vaddr(new_dir)){
+// 		thread_current() -> exit_status = -1; 
+// 		thread_exit(); 
+// 	}
+// 	if (strlen(new_dir) == 0 || strcmp(new_dir, "/") == 0){
+// 		return false;
+// 	}
+// 	struct dir *pasered_dir = malloc(sizeof(struct dir)); 
+// 	char parsered_filename[200]; 
+// 	bool res = parser_path_and_file(new_dir, &pasered_dir, parsered_filename); 
+// 	printf("parsered file name: %s \n", parsered_filename); 
+// 	if (res == false) {
+// 		printf("false in parser path and filename \n"); 
+// 		return false;
+// 	} 
+	
+// 	struct inode *inode = NULL; 
+// 	dir_lookup(pasered_dir, parsered_filename, &inode);
+// 	if (inode != NULL) {
+// 		inode_close(inode);
+// 		dir_close(pasered_dir);
+// 		free(parsered_filename);
+// 		return false; 
+// 	}
+// 	disk_sector_t inode_sector = cluster_to_sector(fat_create_chain(0));
+// 	bool res_create = dir_create(inode_sector, 0); 
+// 	bool res_add = dir_add(pasered_dir, parsered_filename, inode_sector);
+// 	if (!res_create && !res_add && inode_sector != 0)
+// 		fat_remove_chain(sector_to_cluster(inode_sector), 0);
+	
+// 	struct dir *final_new_dir = dir_open(inode_open(inode_sector));
+// 	dir_add(final_new_dir, ".", inode_sector);
+// 	dir_add(final_new_dir, "..", inode_get_inumber(dir_get_inode(pasered_dir)));
+// 	dir_close(final_new_dir);
+
+// 	dir_close(pasered_dir);
+// 	free(parsered_filename);
+// 	return res_create && res_add; 
+// }
+
+// bool syscall_readdir(int fd, char *name){
+// 	if (!is_user_vaddr(name)){
+// 		thread_current() -> exit_status = -1; 
+// 		thread_exit(); 
+// 	}
+// 	struct file *f = process_get_file(fd);
+	
+// 	if ( !inode_is_dir(file_get_inode(f))) return false; 
+
+// 	return dir_readdir((struct dir *) f, name);
+// }
+
+// bool syscall_isdir(int fd){
+// 	struct file *file = process_get_file(fd);
+// 	return inode_is_dir(file_get_inode(file)); 
+// }
+
+// int syscall_inumber(int fd){
+// 	struct file *file = process_get_file(fd);
+// 	return inode_get_inumber(file_get_inode(file));
+// }
+
+// int syscall_symlink(const char *target, const char *linked_path){
+// 	if (!is_user_vaddr(target) || !is_user_vaddr(linked_path)){
+// 		thread_current() -> exit_status = -1; 
+// 		thread_exit(); 
+// 	}
+// 	struct dir *pasered_dir = malloc(sizeof(struct dir)); 
+// 	char parsered_filename[200]; 
+	
+// 	bool res = parser_path_and_file(target, &pasered_dir, parsered_filename); 
+// 	printf("parsered file name: %s \n", parsered_filename); 
+// 	if (res == false) {
+// 		printf("false in parser path and filename \n"); 
+// 		return false;
+// 	} 
+// }
+// #endif
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f) {
@@ -613,16 +666,36 @@ syscall_handler (struct intr_frame *f) {
 			syscall_munmap(f->R.rdi); 
 			break; 
 #endif
+// #ifdef EFILESYS
+// 		case SYS_CHDIR:
+// 			f -> R.rax = syscall_chdir(fname);
+// 			break; 
+// 		case SYS_MKDIR:
+// 			f -> R.rax = syscall_mkdir(fname);
+// 			break; 
+// 		case SYS_READDIR:
+// 			f -> R.rax = syscall_readdir(f -> R.rdi, f -> R.rsi);
+// 			break; 
+// #endif
 #ifdef EFILESYS
 		case SYS_CHDIR:
-			f -> R.rax = syscall_chdir(fname);
-			break; 
+			f->R.rax = SyS_chdir(f->R.rdi);
+			break;
 		case SYS_MKDIR:
-			f -> R.rax = syscall_mkdir(fname);
-			break; 
+			f->R.rax = SyS_mkdir(f->R.rdi);
+			break;
 		case SYS_READDIR:
-			f -> R.rax = syscall_readdir(f -> R.rdi, f -> R.rsi);
-			break; 
+			f->R.rax = SyS_readdir(f->R.rdi, f->R.rsi);
+			break;
+		case SYS_ISDIR:
+			f->R.rax = SyS_isdir(f->R.rdi);
+			break;
+		case SYS_INUMBER:
+			f->R.rax = SyS_inumber(f->R.rdi);
+			break;
+		case SYS_SYMLINK:
+			f->R.rax = SyS_symlink(f->R.rdi, f->R.rsi);
+			break;
 #endif
 		default:
 			printf ("Unexpected Syscall: %llx", f->R.rax);

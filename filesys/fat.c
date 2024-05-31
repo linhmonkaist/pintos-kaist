@@ -172,30 +172,27 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
-	cluster_t i = 2;
-	while (fat_get(i) != 0 && i < fat_fs->fat_length) {
-		++i;
+	char zero_buf[DISK_SECTOR_SIZE] = {0};
+	cluster_t empty_clst;
+	uint32_t i;
+
+	for (i = 2; i < fat_fs->fat_length; i++) {
+		if (fat_get(i) == 0)
+			goto find;
 	}
+	return 0;
 
-	// if FAT is full
-	if (i == fat_fs->fat_length) {	
-		return 0;
-	}
+find:
+	empty_clst = i;
 
-	// Update FAT value
-	fat_put(i, EOChain);	
+	if (clst != 0) {
+		fat_put(empty_clst, EOChain);
+		fat_put(clst, empty_clst);
+	} else
+		fat_put(empty_clst, EOChain);
 
-	// Start a new chain
-	if (clst == 0) {	
-		return i;
-	}
-
-	while(fat_get(clst) != EOChain) {
-		clst = fat_get(clst);
-	}
-
-	fat_put(clst, i);
-	return i;
+	disk_write(filesys_disk, cluster_to_sector(empty_clst), zero_buf);
+	return empty_clst;
 }
 
 /* Remove the chain of clusters starting from CLST.

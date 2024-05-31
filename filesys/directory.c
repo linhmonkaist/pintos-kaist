@@ -25,7 +25,7 @@ struct dir_entry {
  * given SECTOR.  Returns true if successful, false on failure. */
 bool
 dir_create (disk_sector_t sector, size_t entry_cnt) {
-	return inode_create (sector, entry_cnt * sizeof (struct dir_entry)); //is_dir set to 1
+	return inode_create (sector, entry_cnt * sizeof (struct dir_entry), F_DIR); //is_dir set to 1
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -33,14 +33,17 @@ dir_create (disk_sector_t sector, size_t entry_cnt) {
 struct dir *
 dir_open (struct inode *inode) {
 	struct dir *dir = calloc (1, sizeof *dir);
+	// printf("call dir open at the bgin \n"); 
 	if (inode != NULL && dir != NULL) {
 		ASSERT(inode_is_dir(inode));
 		dir->inode = inode;
 		dir->pos = 0;
+		// printf("call dir open with not null \n"); 
 		return dir;
 	} else {
 		inode_close (inode);
 		free (dir);
+		// printf("call dir open with null \n"); 
 		return NULL;
 	}
 }
@@ -60,6 +63,7 @@ dir_open_root (void) {
  * Returns a null pointer on failure. */
 struct dir *
 dir_reopen (struct dir *dir) {
+	// printf("call dir_reopen \n"); 
 	return dir_open (inode_reopen (dir->inode));
 }
 
@@ -192,7 +196,7 @@ dir_remove (struct dir *dir, const char *name) {
 	if (inode == NULL)
 		goto done;
 
-#ifdef EFILESYS
+// #ifdef EFILESYS
 	/* If file is directory. */
 	if (inode_is_dir(inode)){
 		if (thread_current()->working_dir &&
@@ -213,7 +217,7 @@ dir_remove (struct dir *dir, const char *name) {
 			return false;
 		}
 	}
-#endif
+// #endif
 
 	/* Erase directory entry. */
 	e.in_use = false;
@@ -251,63 +255,63 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 }
 
 /*get path and open it. Path can be absolute or relative*/
-struct dir *get_dir_from_path(const char *path){
-	struct dir *current_working_dir = thread_current() -> cur_dir; 
-	struct dir *new_dir = NULL; 
+// struct dir *get_dir_from_path(const char *path){
+// 	struct dir *current_working_dir = thread_current() -> working_dir; 
+// 	struct dir *new_dir = NULL; 
 
-	//check the valid of path
-	if (strlen(path) ==  0) return NULL; 
+// 	//check the valid of path
+// 	if (strlen(path) ==  0) return NULL; 
 
-	//copy path 
-	char *copy_path = malloc(strlen(path) + 1);
-	if (!copy_path) return NULL; 
+// 	//copy path 
+// 	char *copy_path = malloc(strlen(path) + 1);
+// 	if (!copy_path) return NULL; 
 
-	memcpy(copy_path, path, strlen(path) + 1);  
+// 	memcpy(copy_path, path, strlen(path) + 1);  
 
-	//if path is absolute, open the root
-	if (copy_path[0] == '/'){
-		new_dir = dir_open_root(); 
-	} else {
-		new_dir = dir_reopen(current_working_dir); 
-	}
+// 	//if path is absolute, open the root
+// 	if (copy_path[0] == '/'){
+// 		new_dir = dir_open_root(); 
+// 	} else {
+// 		new_dir = dir_reopen(current_working_dir); 
+// 	}
 
-	//go in each dir of the path and open it with new_dir
-	char *temp = NULL; 
-	char *token = strtok_r(copy_path, '/', &temp);
-	char *cur = strtok_r(NULL, '/', &temp);
-	struct inode *inode; 
+// 	//go in each dir of the path and open it with new_dir
+// 	char *temp = NULL; 
+// 	char *token = strtok_r(copy_path, '/', &temp);
+// 	char *cur = strtok_r(NULL, '/', &temp);
+// 	struct inode *inode; 
 
-	while (token != NULL && cur != NULL){
-		dir_lookup(new_dir, token, &inode);
-		if (inode == NULL) goto fail_no_inode;
-		dir_close(new_dir);
+// 	while (token != NULL && cur != NULL){
+// 		dir_lookup(new_dir, token, &inode);
+// 		if (inode == NULL) goto fail_no_inode;
+// 		dir_close(new_dir);
 
-		if (inode_is_symlink(inode)){
-			char *pointed_path = inode_get_sym_path(inode); 
+// 		if (inode_is_symlink(inode)){
+// 			char *pointed_path = inode_get_sym_path(inode); 
 
-			new_dir = get_dir_from_path(pointed_path); 
-			if (new_dir == NULL) PANIC("symbolic name parser error"); 
-			return new_dir; 
-		}
-		if (!inode_is_dir(inode)) goto fail_close_inode; 
-		new_dir = dir_open(inode); 
-		token = cur; 
-		cur = strtok_r(NULL, '/', &temp);
-	}
+// 			new_dir = get_dir_from_path(pointed_path); 
+// 			if (new_dir == NULL) PANIC("symbolic name parser error"); 
+// 			return new_dir; 
+// 		}
+// 		if (!inode_is_dir(inode)) goto fail_close_inode; 
+// 		new_dir = dir_open(inode); 
+// 		token = cur; 
+// 		cur = strtok_r(NULL, '/', &temp);
+// 	}
 
-	return new_dir; 
-fail_close_inode: 
-	inode_close(inode);
-fail_no_inode: 
-	free(copy_path);
-	dir_close(new_dir);
-	return NULL; 
-}
+// 	return new_dir; 
+// fail_close_inode: 
+// 	inode_close(inode);
+// fail_no_inode: 
+// 	free(copy_path);
+// 	dir_close(new_dir);
+// 	return NULL; 
+// }
 
 /*function to get directory and file/folder in that directory based on the input directory*/
 bool parser_path_and_file(const char *input_dir, struct dir *dir, char *filename){
 	if (strlen(input_dir) == 0){
-		dir = thread_current() -> cur_dir; 
+		dir = thread_current() -> working_dir; 
 		return true;  
 	}
 
@@ -316,7 +320,7 @@ bool parser_path_and_file(const char *input_dir, struct dir *dir, char *filename
 
 	struct dir *current_dir; 
 	if (input_dir[0] == '/') current_dir = dir_open_root();
-	else current_dir = thread_current() -> cur_dir; 
+	else current_dir = thread_current() -> working_dir; 
 
 	struct inode *inode = NULL; 
 	char *temp;
@@ -336,7 +340,7 @@ bool parser_path_and_file(const char *input_dir, struct dir *dir, char *filename
 		dir_close(current_dir); 
 
 		if (inode_is_symlink(inode)){
-			char *pointed_path = inode_get_sym_path(inode); 
+			char *pointed_path = inode_symlink_path(inode); 
 
 			bool res = parser_path_and_file(pointed_path, current_dir, filename); 
 			if (res = false ) PANIC("symbolic name parser error"); 
@@ -354,4 +358,197 @@ fail_no_inode:
 	free(copy_dir);
 	dir_close(current_dir);
 	return false; 
+}
+
+
+//Solution_4 just put here in case needed during debuging
+
+/* Get the name of file from the full path and store. */
+bool
+get_fname_from_path (const char* path, char* name) {
+	char *last_slash = strrchr(path, '/');
+
+	if (last_slash) {
+		if (strlen(last_slash) > NAME_MAX + 1)
+			return false;
+		strlcpy(name, last_slash + 1, NAME_MAX + 1);
+	}
+	else {
+		if (strlen(path) > NAME_MAX + 1)
+			return false;
+		strlcpy(name, path, NAME_MAX + 1);
+	}
+	return true;
+}
+
+/* Get last directory from the path and open. */
+struct dir *
+get_dir_from_path (const char *__path) {
+	struct dir *dir = NULL;
+	char *old, *path = NULL;
+	char *parsing = NULL;
+	char *remain = NULL;
+	char *save = NULL;
+	struct inode *inode = NULL;
+	struct dir *working_dir = thread_current()->working_dir;
+
+	if (strlen(__path) == 0)
+		return NULL;
+
+	path = (char *) malloc (strlen(__path) + 1);
+	if (!path)
+		return NULL;
+	memcpy(path, __path, strlen(__path) + 1);
+	old = path;
+	// printf("I'm in the get dir from path before open path %s \n", path); 
+	/* Absolute path */
+	if (path[0] == '/') {
+		printf("call dir_open_root %s \n", path);
+		dir = dir_open_root();
+		path += 1;
+		if (strlen(path) == 0) {
+			free(old);
+			return dir;
+		}
+	}
+	else /* Relative path */
+		dir = dir_reopen(working_dir);
+	// printf("I'm in the get dir from path, done with open dir \n"); 
+	parsing = strtok_r(path, "/", &save);
+	remain = strtok_r(NULL, "/", &save);
+
+	while (parsing != NULL && remain != NULL) {
+		dir_lookup(dir, parsing, &inode);
+		 
+		if (inode == NULL)
+			goto fail;
+		dir_close(dir);
+
+		/* symlink case */
+		if (inode_is_symlink(inode)) {
+			char *name_file = (char *) malloc(NAME_MAX + 1);
+			char *symlink_path = inode_symlink_path(inode);
+
+			get_fname_from_path(symlink_path, name_file);
+			dir = get_dir_from_path(symlink_path);
+			if (dir == NULL) {
+				free(name_file);
+				PANIC("PATH PARSING: soft_link error");
+			}
+			inode_close(inode);
+			dir_lookup(dir, name_file, &inode);
+			free(name_file);
+			if (inode == NULL)
+				goto fail;
+		}
+
+		if (inode_is_dir(inode) == false)
+			goto fail;
+
+		dir = dir_open(inode);
+		parsing = remain;
+		remain = strtok_r(NULL, "/", &save);
+	}
+	// PANIC("in get_dir_from_path, %s , %s \n", parsing, remain);
+	// free(old);
+	// printf("I'm in the get dir from path \n"); 
+	return dir;
+
+fail:
+	// printf("I'm in fail the get dir from path \n");
+	free(old);
+	dir_close(dir);
+	inode_close(inode);
+	return NULL;
+}
+
+/* Change directory if name is exist in current directory. */
+bool
+dir_chdir (const char* path) {
+	struct inode *inode = NULL;
+	struct dir *new_dir = NULL;
+	char *name_dir = NULL;
+	bool ret = false;
+
+	/* Root directory */
+	if (strcmp(path, "/") == 0) {
+		dir_close(thread_current()->working_dir);
+		thread_current()->working_dir = dir_open_root();
+		ret = true;
+		goto ret;
+	}
+
+	name_dir = (char *) malloc(NAME_MAX + 1);
+	if (name_dir == NULL)
+		goto ret;
+
+	if (!get_fname_from_path(path, name_dir))
+		goto free;
+
+	new_dir = get_dir_from_path(path);
+	if (new_dir == NULL)
+		goto free;
+
+	if (!dir_lookup(new_dir, name_dir, &inode)
+		|| inode == NULL || !inode_is_dir(inode)) {
+		inode_close(inode);
+		goto close;
+	}
+
+	dir_close(thread_current()->working_dir);
+	thread_current()->working_dir = dir_open(inode);
+	ret = true;
+
+close:
+	dir_close(new_dir);
+free:
+	free(name_dir);
+ret:
+	return ret;
+}
+
+/* Make directory */
+bool
+dir_mkdir(const char* path) {
+	struct dir *curr_dir = NULL;
+	struct dir *new_dir = NULL;
+	char *new_dir_name = NULL;
+	struct inode *inode = NULL;
+	disk_sector_t inode_sector = 0;
+	bool ret = false;
+
+	new_dir_name = (char *) malloc(NAME_MAX + 1);
+	if (new_dir_name == NULL)
+		return ret;
+
+	if (!get_fname_from_path(path, new_dir_name))
+		goto free;
+
+	curr_dir = get_dir_from_path(path);
+	if (curr_dir == NULL)
+		goto free;
+
+	dir_lookup(curr_dir, new_dir_name, &inode);
+	if (inode != NULL) {
+		inode_close(inode);
+		goto close;
+	}
+
+	ret = ((inode_sector = cluster_to_sector(fat_create_chain(0)))
+			&& dir_create (inode_sector, 0)
+			&& dir_add (curr_dir, new_dir_name, inode_sector));
+
+	if (!ret && inode_sector != 0)
+		fat_remove_chain(sector_to_cluster(inode_sector), 0);
+
+	new_dir = dir_open(inode_open(inode_sector));
+	dir_add(new_dir, ".", inode_sector);
+	dir_add(new_dir, "..", inode_get_inumber(dir_get_inode(curr_dir)));
+	dir_close(new_dir);
+
+close:
+	dir_close(curr_dir);
+free:
+	free(new_dir_name);
+	return ret;
 }

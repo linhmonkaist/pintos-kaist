@@ -127,11 +127,12 @@ filesys_open (const char *name) {
 	file_name = (char *) malloc(NAME_MAX + 1);
 	if (!file_name)
 		return NULL;
-
+	// printf("I'm in after malloc in filesys open \n");
 	if (!get_fname_from_path(name, file_name))
 		goto free;
-
+	// printf("I'm in after get_fname_from_path in filesys open \n");
 	dir = get_dir_from_path(name);
+	// printf("I'm in after get dir from path \n");
 	if (dir == NULL)
 		goto close;
 
@@ -143,12 +144,14 @@ filesys_open (const char *name) {
 		result = filesys_open(inode_symlink_path(inode));
 	else
 		result = file_open(inode);
-
+	// printf("I'm nearly close \n");
 close:
 	dir_close(dir);
 free:
+// printf("I'm going to free \n");
 	free(file_name);
-	return result;
+	// if (result == NULL ) printf("return a null val \n"); 
+ 	return result;
 }
 #else
 struct file *

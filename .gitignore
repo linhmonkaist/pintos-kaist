@@ -1,5 +1,6 @@
+*/build/*
+/filesys/build
 /userprog/build
 .vscode
 /vm/build
 /threads/build
-/filesys/build
