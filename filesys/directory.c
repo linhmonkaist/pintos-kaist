@@ -403,7 +403,7 @@ get_dir_from_path (const char *__path) {
 	// printf("I'm in the get dir from path before open path %s \n", path); 
 	/* Absolute path */
 	if (path[0] == '/') {
-		printf("call dir_open_root %s \n", path);
+		// printf("call dir_open_root %s \n", path);
 		dir = dir_open_root();
 		path += 1;
 		if (strlen(path) == 0) {
@@ -525,6 +525,7 @@ dir_mkdir(const char* path) {
 		goto free;
 
 	curr_dir = get_dir_from_path(path);
+	// printf("call make dir \n");
 	if (curr_dir == NULL)
 		goto free;
 
