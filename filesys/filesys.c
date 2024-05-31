@@ -97,14 +97,14 @@ bool
 filesys_create (const char *name, off_t initial_size) {
 	// PANIC("===timeout here===") didn't go here;
 	disk_sector_t inode_sector = 0;
-	struct dir *dir = dir_open_root ();
-	bool success = (dir != NULL
+	// struct dir *dir = dir_open_root ();
+	bool success = (dir_open_root () != NULL
 			&& free_map_allocate (1, &inode_sector)
 			&& inode_create (inode_sector, initial_size, F_REG)
-			&& dir_add (dir, name, inode_sector));
+			&& dir_add (dir_open_root (), name, inode_sector));
 	if (!success && inode_sector != 0)
 		free_map_release (inode_sector, 1);
-	dir_close (dir);
+	dir_close (dir_open_root ());
 
 	return success;
 }
@@ -155,6 +155,7 @@ free:
 #else
 struct file *
 filesys_open (const char *name) {
+	// PANIC("why are you not workingggg");
 	struct dir *dir = dir_open_root ();
 	struct inode *inode = NULL;
 
@@ -221,7 +222,7 @@ filesys_symlink(const char* target, const char* linkpath){
 	char *name_file = NULL;
 	struct dir *dir = NULL;
 	disk_sector_t inode_sector = 0;
-	int ret;
+	int ret = -1;
 
 	if (target == NULL || linkpath == NULL
 		|| strlen(target) == 0
