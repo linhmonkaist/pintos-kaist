@@ -6,5 +6,4 @@ filesys/fat.o: ../../filesys/fat.c ../../include/filesys/fat.h \
  ../../include/threads/malloc.h ../../include/lib/debug.h \
  ../../include/threads/synch.h ../../include/lib/kernel/list.h \
  ../../include/lib/stdio.h ../../include/lib/stdarg.h \
- ../../include/lib/kernel/stdio.h ../../include/lib/string.h \
- ../../include/lib/kernel/bitmap.h
+ ../../include/lib/kernel/stdio.h ../../include/lib/string.h

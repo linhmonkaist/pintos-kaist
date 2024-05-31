@@ -44,12 +44,12 @@ Executing 'priority-condvar':
 (priority-condvar) Thread priority 21 woke up.
 (priority-condvar) end
 Execution of 'priority-condvar' complete.
-Timer: 82 ticks
-Thread: 33 idle ticks, 49 kernel ticks, 0 user ticks
+Timer: 110 ticks
+Thread: 33 idle ticks, 78 kernel ticks, 0 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 158 reads, 317 writes
 hd1:1: 0 reads, 0 writes
-Console: 2083 characters output
+Console: 2084 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

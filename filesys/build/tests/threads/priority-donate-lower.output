@@ -21,8 +21,8 @@ Executing 'priority-donate-lower':
 (priority-donate-lower) Main thread should have priority 21.  Actual priority: 21.
 (priority-donate-lower) end
 Execution of 'priority-donate-lower' complete.
-Timer: 81 ticks
-Thread: 30 idle ticks, 51 kernel ticks, 0 user ticks
+Timer: 92 ticks
+Thread: 35 idle ticks, 58 kernel ticks, 0 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 158 reads, 317 writes
 hd1:1: 0 reads, 0 writes

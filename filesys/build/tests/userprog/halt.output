@@ -13,7 +13,7 @@ Formatting file system...done.
 Boot complete.
 Putting 'halt' into the file system...
 Kernel PANIC at ../../lib/kernel/bitmap.c:272 in bitmap_scan(): assertion `b != NULL' failed.
-Call stack: 0x80042147d5 0x800421699d 0x8004216a9a 0x800421c48e 0x800421b829 0x800421e271 0x80042068cc 0x8004206186.
+Call stack: 0x80042147d5 0x800421699d 0x8004216a9a 0x800421c4d5 0x800421b856 0x800421e2b8 0x80042068cc 0x8004206186.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.

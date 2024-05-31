@@ -5,7 +5,6 @@
 #include "threads/synch.h"
 #include <stdio.h>
 #include <string.h>
-#include <bitmap.h>
 
 /* Should be less than DISK_SECTOR_SIZE */
 struct fat_boot {
@@ -21,8 +20,8 @@ struct fat_boot {
 struct fat_fs {
 	struct fat_boot bs;
 	unsigned int *fat;
-	unsigned int fat_length; // Should be initialized
-	disk_sector_t data_start;// Should be initialized
+	unsigned int fat_length;
+	disk_sector_t data_start;
 	cluster_t last_clst;
 	struct lock write_lock;
 };
@@ -154,16 +153,12 @@ fat_boot_create (void) {
 void
 fat_fs_init (void) {
 	/* TODO: Your code goes here. */
-	//FAT byte size --> no of sectors * 512 bytes/sector per cluster
-	// the number of clusters in the file system
 
-	fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors) / (sizeof(cluster_t) * SECTORS_PER_CLUSTER);
-	// fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors) / SECTORS_PER_CLUSTER;
-	// Set starting point of DATA sector
-	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
-	
+	fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors)
+						/ SECTORS_PER_CLUSTER;
+	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors + 1;
+
 	lock_init(&fat_fs->write_lock);
-
 }
 
 /*----------------------------------------------------------------------------*/
@@ -176,31 +171,27 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
-	cluster_t i = 2;
-	while (fat_get(i) != 0 && i < fat_fs->fat_length) {
-		++i;
+	char zero_buf[DISK_SECTOR_SIZE] = {0};
+	cluster_t empty_clst;
+	uint32_t i;
+
+	for (i = 2; i < fat_fs->fat_length; i++) {
+		if (fat_get(i) == 0)
+			goto find;
 	}
+	return 0;
 
-	// if FAT is full
-	if (i == fat_fs->fat_length) {	
-		return 0;
-	}
+find:
+	empty_clst = i;
 
-	// Update FAT value
-	fat_put(i, EOChain);	
+	if (clst != 0) {
+		fat_put(empty_clst, EOChain);
+		fat_put(clst, empty_clst);
+	} else
+		fat_put(empty_clst, EOChain);
 
-	// Start a new chain
-	if (clst == 0) {	
-		return i;
-	}
-
-	while(fat_get(clst) != EOChain) {
-		clst = fat_get(clst);
-	}
-
-	fat_put(clst, i);
-	return i;
-
+	disk_write(filesys_disk, cluster_to_sector(empty_clst), zero_buf);
+	return empty_clst;
 }
 
 /* Remove the chain of clusters starting from CLST.
@@ -208,21 +199,42 @@ fat_create_chain (cluster_t clst) {
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
 	/* TODO: Your code goes here. */
+	cluster_t temp, i;
+
+	ASSERT(pclst == 0 || fat_get(pclst) == clst);
+
+	if (pclst != 0)
+		fat_put(pclst, EOChain);
+
+	i = clst;
+	while (i != EOChain) {
+		temp = fat_get(i);
+		fat_put(i, 0);
+		i = temp;
+	}
 }
 
 /* Update a value in the FAT table. */
 void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
-	/* Updates clst with val */
+
+	if (clst <= 0 || clst >= fat_fs->fat_length)
+		return;
+
+	lock_acquire(&fat_fs->write_lock);
 	fat_fs->fat[clst] = val;
+	lock_release(&fat_fs->write_lock);
+
 }
 
 /* Fetch a value in the FAT table. */
 cluster_t
 fat_get (cluster_t clst) {
 	/* TODO: Your code goes here. */
-	/* Get number of the cluster clst given */
+	if (clst == 0 || clst >= fat_fs->fat_length)
+		PANIC("wrong clst");
+
 	return fat_fs->fat[clst];
 }
 
@@ -230,10 +242,13 @@ fat_get (cluster_t clst) {
 disk_sector_t
 cluster_to_sector (cluster_t clst) {
 	/* TODO: Your code goes here. */
-	/* return clst corresponding sector number*/
-
 	if (clst == 0)
 		return 0;
 
-	return fat_fs->data_start + clst;
+	return fat_fs->data_start + (clst-2) * SECTORS_PER_CLUSTER;
+}
+
+cluster_t
+sector_to_cluster (disk_sector_t sector) {
+   return ((sector - fat_fs->data_start) / SECTORS_PER_CLUSTER) + 2;
 }

@@ -7,8 +7,18 @@
 
 struct bitmap;
 
+typedef unsigned char type_t;
+
+enum FTYPE {
+    F_INIT,
+    F_REG,      /* Regular file */
+    F_DIR,      /* Directory */
+    F_SYML      /* Softlink (Symlink) */
+};
+
 void inode_init (void);
-bool inode_create (disk_sector_t, off_t);
+// bool inode_create (disk_sector_t, off_t);
+bool inode_create (disk_sector_t, off_t, type_t);
 struct inode *inode_open (disk_sector_t);
 struct inode *inode_reopen (struct inode *);
 disk_sector_t inode_get_inumber (const struct inode *);
