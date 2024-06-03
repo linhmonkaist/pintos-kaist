@@ -152,13 +152,16 @@ fat_boot_create (void) {
 }
 
 void
-fat_fs_init (void) {
+fat_fs_init (void) {	
 	/* TODO: Your code goes here. */
 
 	fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors)
 						/ SECTORS_PER_CLUSTER;
+	// fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors -1)
+						// / SECTORS_PER_CLUSTER;
 	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors + 1;
-
+	// fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
+	// fat_fs->last_clst   = fat_fs->bs.root_dir_cluster + 1; // ADDED
 	lock_init(&fat_fs->write_lock);
 }
 
@@ -172,26 +175,55 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
+// 	// lock_acquire (&fat_fs->write_lock);
+// 	char zero_buf[DISK_SECTOR_SIZE] = {0};
+// 	cluster_t empty_clst;
+// 	uint32_t i;
+
+// 	for (i = 2; i < fat_fs->fat_length; i++) {
+// 		if (fat_get(i) == 0)
+// 			goto find;
+// 	}
+// 	return 0;
+
+// find:
+// 	empty_clst = i;
+
+// 	if (clst != 0) {
+// 		fat_put(empty_clst, EOChain);
+// 		fat_put(clst, empty_clst);
+// 	} else
+// 		fat_put(empty_clst, EOChain);
+
+// 	disk_write(filesys_disk, cluster_to_sector(empty_clst), zero_buf);
+// 	return empty_clst;
 	char zero_buf[DISK_SECTOR_SIZE] = {0};
-	cluster_t empty_clst;
-	uint32_t i;
+	cluster_t empty_clst = 0;
 
-	for (i = 2; i < fat_fs->fat_length; i++) {
-		if (fat_get(i) == 0)
-			goto find;
+	/* Search for an empty cluster */
+	for (cluster_t i = 2; i < fat_fs->fat_length; i++) {
+		if (fat_get(i) == 0) {
+			empty_clst = i;
+			break;
+		}
 	}
-	return 0;
 
-find:
-	empty_clst = i;
+	/* If no empty cluster found, return 0 */
+	if (empty_clst == 0) {
+		return 0;
+	}
 
+	/* If clst is provided, link it to the new empty cluster */
 	if (clst != 0) {
-		fat_put(empty_clst, EOChain);
 		fat_put(clst, empty_clst);
-	} else
-		fat_put(empty_clst, EOChain);
+	}
+	
+	/* Mark the new empty cluster as end of chain */
+	fat_put(empty_clst, EOChain);
 
+	/* Clear the new cluster on disk */
 	disk_write(filesys_disk, cluster_to_sector(empty_clst), zero_buf);
+
 	return empty_clst;
 }
 
@@ -200,18 +232,21 @@ find:
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
 	/* TODO: Your code goes here. */
-	cluster_t temp, i;
+	/* Check the pclst if provided. */
+	if (pclst != 0 && fat_get(pclst) != clst) {
+		PANIC("Invalid parent cluster");
+	}
 
-	ASSERT(pclst == 0 || fat_get(pclst) == clst);
-
-	if (pclst != 0)
+	/* If pclst is not 0, set as end of chain. */
+	if (pclst != 0) {
 		fat_put(pclst, EOChain);
+	}
 
-	i = clst;
-	while (i != EOChain) {
-		temp = fat_get(i);
-		fat_put(i, 0);
-		i = temp;
+	/* remove the chain starting from clst. */
+	while (clst != EOChain) {
+		cluster_t next_clst = fat_get(clst);
+		fat_put(clst, 0);
+		clst = next_clst;
 	}
 }
 
@@ -220,11 +255,23 @@ void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
 
-	if (clst <= 0 || clst >= fat_fs->fat_length)
-		return;
+	// if (clst <= 0 || clst >= fat_fs->fat_length)
+	// 	return;
 
+	// lock_acquire(&fat_fs->write_lock);
+	// fat_fs->fat[clst] = val;
+	// lock_release(&fat_fs->write_lock);
+	if (clst == 0 || clst >= fat_fs->fat_length) {
+		PANIC("The cluster number is not valid");
+	}
+
+	/* Acquire the write lock to ensure thread safety. */
 	lock_acquire(&fat_fs->write_lock);
+
+	/* Update the FAT entry. */
 	fat_fs->fat[clst] = val;
+
+	/* Release the write lock. */
 	lock_release(&fat_fs->write_lock);
 
 }
@@ -234,7 +281,7 @@ cluster_t
 fat_get (cluster_t clst) {
 	/* TODO: Your code goes here. */
 	if (clst == 0 || clst >= fat_fs->fat_length)
-		PANIC("wrong clst");
+		PANIC("The cluster in incorrect");
 
 	return fat_fs->fat[clst];
 }
