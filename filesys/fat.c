@@ -17,7 +17,7 @@ struct fat_boot {
 	unsigned int root_dir_cluster;
 };
 
-/* FAT FS */
+/* FAT FS: FAT filesystem */
 struct fat_fs {
 	struct fat_boot bs;
 	unsigned int *fat;

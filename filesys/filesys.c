@@ -64,32 +64,67 @@ filesys_done (void) {
 #ifdef EFILESYS
 bool
 filesys_create (const char *name, off_t initial_size) {
-	char *file_name = NULL;
-	struct dir *dir = NULL;
-	disk_sector_t inode_sector = 0;
-	bool success = false;
+	// char *file_name = NULL;
+	// struct dir *dir = NULL;
+	// disk_sector_t inode_sector = 0;
+	// bool success = false;
 
-	file_name = (char *) malloc(NAME_MAX + 1);
-	if (!file_name)
-		return false;
+	// file_name = (char *) malloc(NAME_MAX + 1);
+	// if (!file_name)
+	// 	return false;
 
-	if (!get_fname_from_path(name, file_name)) {
-		free(file_name);
-		return false;
-	}
-	dir = get_dir_from_path(name);
+	// if (!get_fname_from_path(name, file_name)) {
+	// 	free(file_name);
+	// 	return false;
+	// }
+	// dir = get_dir_from_path(name);
 
-	success = (dir != NULL
-			&& (inode_sector = cluster_to_sector(fat_create_chain(0)))
-			&& inode_create (inode_sector, initial_size, F_REG)
-			&& dir_add (dir, file_name, inode_sector));
+	// success = (dir != NULL
+	// 		&& (inode_sector = cluster_to_sector(fat_create_chain(0)))
+	// 		&& inode_create (inode_sector, initial_size, F_REG)
+	// 		&& dir_add (dir, file_name, inode_sector));
 
-	if (!success && inode_sector != 0)
-		fat_remove_chain(sector_to_cluster(inode_sector), 0);
+	// if (!success && inode_sector != 0)
+	// 	fat_remove_chain(sector_to_cluster(inode_sector), 0);
 
-	free (file_name);
-	dir_close (dir);
-	return success;
+	// free (file_name);
+	// dir_close (dir);
+	// return success;
+
+	char *file_name = malloc(NAME_MAX + 1);
+    if (file_name == NULL) {
+        return false;
+    }
+
+    if (!get_fname_from_path(name, file_name)) {
+        free(file_name);
+        return false;
+    }
+
+    struct dir *dir = get_dir_from_path(name);
+    if (dir == NULL) {
+        free(file_name);
+        return false;
+    }
+
+    disk_sector_t inode_sector = cluster_to_sector(fat_create_chain(0));
+    if (inode_sector == 0) {
+        dir_close(dir);
+        free(file_name);
+        return false;
+    }
+
+    bool success = inode_create(inode_sector, initial_size, F_REG) &&
+                   dir_add(dir, file_name, inode_sector);
+
+    if (!success) {
+        fat_remove_chain(sector_to_cluster(inode_sector), 0);
+    }
+
+    dir_close(dir);
+    free(file_name);
+    return success;
+
 }
 #else
 bool
@@ -121,7 +156,7 @@ filesys_open (const char *name) {
 	struct dir *dir = NULL;
 	struct inode *inode = NULL;
 
-	if (strcmp(name, "/") == 0)
+	if (!strcmp(name, "/"))
 		return dir_open_root();
 
 	file_name = (char *) malloc(NAME_MAX + 1);
@@ -174,20 +209,44 @@ filesys_open (const char *name) {
 #ifdef EFILESYS
 bool
 filesys_remove (const char *name) {
-	char *temp = NULL;
+	// char *temp = NULL;
+	// char *file_name = NULL;
+	// struct dir *dir = NULL;
+
+	// if (strcmp(name, "/") == 0)
+	// 	return false;
+
+	// temp = (char *) malloc(strlen(name) + 1);
+	// if (strlen(name) < NAME_MAX)
+	// 	memcpy(temp, name, strlen(name) + 1);
+	// else
+	// 	memcpy(temp, name, NAME_MAX + 1);
+
+	// file_name = (char *) malloc(NAME_MAX + 1);
+	// if (!get_fname_from_path(name, file_name)) {
+	// 	free(file_name);
+	// 	return false;
+	// }
+
+	// dir = get_dir_from_path(name);
+
+	// bool success = dir != NULL && dir_remove (dir, file_name);
+	// dir_close (dir);
+
+	// free(temp);
+	// free(file_name);
+
+	// return success;
 	char *file_name = NULL;
 	struct dir *dir = NULL;
 
 	if (strcmp(name, "/") == 0)
 		return false;
 
-	temp = (char *) malloc(strlen(name) + 1);
-	if (strlen(name) < NAME_MAX)
-		memcpy(temp, name, strlen(name) + 1);
-	else
-		memcpy(temp, name, NAME_MAX + 1);
-
 	file_name = (char *) malloc(NAME_MAX + 1);
+	if (!file_name)
+		return false;
+
 	if (!get_fname_from_path(name, file_name)) {
 		free(file_name);
 		return false;
@@ -195,13 +254,11 @@ filesys_remove (const char *name) {
 
 	dir = get_dir_from_path(name);
 
-	bool success = dir != NULL && dir_remove (dir, file_name);
+	bool succ = dir != NULL && dir_remove (dir, file_name);
 	dir_close (dir);
 
-	free(temp);
 	free(file_name);
-
-	return success;
+	return succ;
 }
 
 #else
@@ -215,13 +272,15 @@ filesys_remove (const char *name) {
 }
 #endif
 
+#ifdef EFILESYS
 /* Creates a symbolic link named linkpath which contains the string target.
  * Returns 0 if successful, -1 on failure. */
 int
 filesys_symlink(const char* target, const char* linkpath){
-	char *name_file = NULL;
+	char *file_name = NULL;
 	struct dir *dir = NULL;
 	disk_sector_t inode_sector = 0;
+	cluster_t new_clst = 0;
 	int ret = -1;
 
 	if (target == NULL || linkpath == NULL
@@ -229,20 +288,28 @@ filesys_symlink(const char* target, const char* linkpath){
 		|| strlen(linkpath)== 0)
 		return ret;
 
-	name_file = (char *) malloc(NAME_MAX + 1);
-	if (!get_fname_from_path(linkpath, name_file))
+	file_name = (char *) malloc(NAME_MAX + 1);
+	if (!file_name)
+		return ret;
+
+	if (!get_fname_from_path(linkpath, file_name))
 		goto free;
 
 	dir = get_dir_from_path(linkpath);
 	if (dir == NULL)
 		goto close;
 
-	bool succ = ((inode_sector = cluster_to_sector(fat_create_chain(0)))
+	new_clst = fat_create_chain(0);
+	if (new_clst == 0)
+		goto close;
+
+	bool succ = ((inode_sector = cluster_to_sector(new_clst))
 					&& inode_create(inode_sector, 0, F_SYML)
-					&& dir_add(dir, name_file, inode_sector));
+					&& dir_add(dir, file_name, inode_sector));
 	
-	if(!succ && inode_sector != 0) {
-		fat_remove_chain(sector_to_cluster(inode_sector), 0);
+	if(!succ) {
+		if (inode_sector != 0)
+			fat_remove_chain(sector_to_cluster(inode_sector), 0);
 		goto close;
 	}
 
@@ -252,9 +319,45 @@ filesys_symlink(const char* target, const char* linkpath){
 close:
 	dir_close(dir);
 free:
-	free(name_file);
+	free(file_name);
 	return ret;
+// 	char *name_file = NULL;
+// 	struct dir *dir = NULL;
+// 	disk_sector_t inode_sector = 0;
+// 	int ret = -1;
+
+// 	if (target == NULL || linkpath == NULL
+// 		|| strlen(target) == 0
+// 		|| strlen(linkpath)== 0)
+// 		return ret;
+
+// 	name_file = (char *) malloc(NAME_MAX + 1);
+// 	if (!get_fname_from_path(linkpath, name_file))
+// 		goto free;
+
+// 	dir = get_dir_from_path(linkpath);
+// 	if (dir == NULL)
+// 		goto close;
+
+// 	bool succ = ((inode_sector = cluster_to_sector(fat_create_chain(0)))
+// 					&& inode_create(inode_sector, 0, F_SYML)
+// 					&& dir_add(dir, name_file, inode_sector));
+	
+// 	if(!succ && inode_sector != 0) {
+// 		fat_remove_chain(sector_to_cluster(inode_sector), 0);
+// 		goto close;
+// 	}
+
+// 	if (inode_set_symlink(inode_sector, target))
+// 		ret = 0;
+
+// close:
+// 	dir_close(dir);
+// free:
+// 	free(name_file);
+// 	return ret;
 }
+#endif
 
 /* Formats the file system. */
 static void
