@@ -47,31 +47,51 @@ struct inode {
 
 #ifdef EFILESYS
 byte_to_sector (const struct inode *inode, off_t pos) {
-	off_t clst_num;
-	cluster_t clst_cur;
-	disk_sector_t ret = -1;
 
-	ASSERT (inode != NULL);
-	if (pos < inode->data.length) {
-		clst_num = pos / (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
-		clst_cur = sector_to_cluster(inode->data.start);
-		while (clst_num > 0) {
-			clst_cur = fat_get(clst_cur);
-			clst_num--;
-		}
-		ret = cluster_to_sector(clst_cur);
-	}
-	return ret;
+	ASSERT(inode != NULL);
+    if (pos >= inode->data.length) {
+        return -1;
+    }
+    off_t cluster_index = pos / (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
+    cluster_t cluster = sector_to_cluster(inode->data.start);
+
+    for (off_t i = 0; i < cluster_index; i++) {
+        cluster = fat_get(cluster);
+        if (cluster == EOChain) {
+            return -1;
+        }
+    }
+
+   
+    return cluster_to_sector(cluster);
+
+	// off_t clst_num;
+	// cluster_t clst_cur;
+	// disk_sector_t ret = -1;
+
+	// ASSERT (inode != NULL);
+	// if (pos < inode->data.length) {
+	// 	clst_num = pos / (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
+	// 	clst_cur = sector_to_cluster(inode->data.start);
+	// 	while (clst_num > 0) {
+	// 		clst_cur = fat_get(clst_cur);
+	// 		clst_num--;
+	// 	}
+	// 	ret = cluster_to_sector(clst_cur);
+	// }
+	// return ret;
 }
 /* Start -  FAT */
 #else
 static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) {
-	ASSERT (inode != NULL);
-	if (pos < inode->data.length)
-		return inode->data.start + pos / DISK_SECTOR_SIZE;
-	else
-		return -1;
+	ASSERT(inode != NULL);
+
+    if (pos >= inode->data.length) {
+        return -1;
+    }
+
+    return inode->data.start + pos / DISK_SECTOR_SIZE;
 }
 #endif
 
@@ -94,65 +114,62 @@ inode_init (void) {
  * Returns false if memory or disk allocation fails. */
 
 bool
-inode_create (disk_sector_t sector, off_t length, type_t type) {
-	struct inode_disk *disk_inode = NULL;
-	bool success = false;
+inode_create(disk_sector_t sector, off_t length, type_t type) {
+    ASSERT(length >= 0);
 
-	ASSERT (length >= 0);
+    struct inode_disk *disk_inode = calloc(1, sizeof(struct inode_disk));
+    if (disk_inode == NULL) {
+        return false;
+    }
 
-	/* If this assertion fails, the inode structure is not exactly
-	 * one sector in size, and you should fix that. */
-	ASSERT (sizeof *disk_inode == DISK_SECTOR_SIZE);
+    size_t sectors = bytes_to_sectors(length);
+    disk_inode->length = length;
+    disk_inode->magic = INODE_MAGIC;
+    disk_inode->type = type;
 
-	disk_inode = calloc (1, sizeof *disk_inode);
-	if (disk_inode != NULL) {
-		size_t sectors = bytes_to_sectors (length);
-		disk_inode->length = length;
-		disk_inode->magic = INODE_MAGIC;
-		disk_inode->type = type;
+#ifdef EFILESYS
+    // Allocate the first cluster
+    cluster_t first_cluster = fat_create_chain(0);
+    if (first_cluster == 0) {
+        free(disk_inode);
+        return false;
+    }
 
-		#ifdef EFILESYS
-		cluster_t first_clst = fat_create_chain(0);
-		if (first_clst == 0) {
-			free(disk_inode);
-			return success;
-		}
+    disk_inode->start = cluster_to_sector(first_cluster);
 
-		disk_inode->start = cluster_to_sector(first_clst);
-		disk_write(filesys_disk, sector, disk_inode);
+    // Write  inode to sector
+    disk_write(filesys_disk, sector, disk_inode);
 
-		cluster_t cur, len_clst = sectors / SECTORS_PER_CLUSTER;
-		cur = first_clst;
+    cluster_t current_cluster = first_cluster;
+    size_t clusters_needed = DIV_ROUND_UP(sectors, SECTORS_PER_CLUSTER);
 
-		for (; len_clst > 1; len_clst--) {
-			cur = fat_create_chain(cur);
-			if (cur == 0) {
-				fat_remove_chain(first_clst, 0);
-				free(disk_inode);
-				return success;
-			}
-		}
-		success = true;
-		free(disk_inode);
-		return success;
+    for (size_t i = 1; i < clusters_needed; i++) {
+        cluster_t next_cluster = fat_create_chain(current_cluster);
+        if (next_cluster == 0) {
+            fat_remove_chain(first_cluster, 0);
+            free(disk_inode);
+            return false;
+        }
+        current_cluster = next_cluster;
+    }
 
-		#else
+    disk_inode->length = length;
+    disk_write(filesys_disk, sector, disk_inode);
+#else
+    if (free_map_allocate(sectors, &disk_inode->start)) {
+        static char zeros[DISK_SECTOR_SIZE];
+        disk_write(filesys_disk, sector, disk_inode);
+        for (size_t i = 0; i < sectors; i++) {
+            disk_write(filesys_disk, disk_inode->start + i, zeros);
+        }
+    } else {
+        free(disk_inode);
+        return false;
+    }
+#endif
 
-		if (free_map_allocate (sectors, &disk_inode->start)) {
-			disk_write (filesys_disk, sector, disk_inode);
-			if (sectors > 0) {
-				static char zeros[DISK_SECTOR_SIZE];
-				size_t i;
-
-				for (i = 0; i < sectors; i++) 
-					disk_write (filesys_disk, disk_inode->start + i, zeros); 
-			}
-			success = true; 
-		} 
-		free (disk_inode);
-		return success;
-		#endif
-	}
+    free(disk_inode);
+    return true;
 }
 
 /* Reads an inode from SECTOR

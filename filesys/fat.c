@@ -160,8 +160,7 @@ fat_fs_init (void) {
 	// fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors -1)
 						// / SECTORS_PER_CLUSTER;
 	fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors + 1;
-	// fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors;
-	// fat_fs->last_clst   = fat_fs->bs.root_dir_cluster + 1; // ADDED
+	
 	lock_init(&fat_fs->write_lock);
 }
 
@@ -175,28 +174,7 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */
-// 	// lock_acquire (&fat_fs->write_lock);
-// 	char zero_buf[DISK_SECTOR_SIZE] = {0};
-// 	cluster_t empty_clst;
-// 	uint32_t i;
 
-// 	for (i = 2; i < fat_fs->fat_length; i++) {
-// 		if (fat_get(i) == 0)
-// 			goto find;
-// 	}
-// 	return 0;
-
-// find:
-// 	empty_clst = i;
-
-// 	if (clst != 0) {
-// 		fat_put(empty_clst, EOChain);
-// 		fat_put(clst, empty_clst);
-// 	} else
-// 		fat_put(empty_clst, EOChain);
-
-// 	disk_write(filesys_disk, cluster_to_sector(empty_clst), zero_buf);
-// 	return empty_clst;
 	char zero_buf[DISK_SECTOR_SIZE] = {0};
 	cluster_t empty_clst = 0;
 
@@ -255,12 +233,6 @@ void
 fat_put (cluster_t clst, cluster_t val) {
 	/* TODO: Your code goes here. */
 
-	// if (clst <= 0 || clst >= fat_fs->fat_length)
-	// 	return;
-
-	// lock_acquire(&fat_fs->write_lock);
-	// fat_fs->fat[clst] = val;
-	// lock_release(&fat_fs->write_lock);
 	if (clst == 0 || clst >= fat_fs->fat_length) {
 		PANIC("The cluster number is not valid");
 	}
