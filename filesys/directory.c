@@ -121,6 +121,7 @@ dir_lookup (const struct dir *dir, const char *name,
 	ASSERT (name != NULL);
 
 	if (lookup (dir, name, &e, NULL))
+	
 		*inode = inode_open (e.inode_sector);
 	else
 		*inode = NULL;
@@ -236,23 +237,29 @@ done:
 /* Reads the next directory entry in DIR and stores the name in
  * NAME.  Returns true if successful, false if the directory
  * contains no more entries. */
+/* Reads the next directory entry in DIR and stores the name in
+ * NAME. Returns true if successful, false if the directory
+ * contains no more entries. */
 bool
-dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
-	struct dir_entry e;
+dir_readdir(struct dir *dir, char name[NAME_MAX + 1]) {
+    struct dir_entry e;
 
-	if (dir->pos == 0)
-		dir->pos += sizeof(e) * 2;
+    // Skip the first two entries if this is the first read
+    if (dir->pos == 0) {
+        dir->pos += 2 * sizeof(e);
+    }
 
-	while (inode_read_at (dir->inode, &e, sizeof e, dir->pos) == sizeof e) {
-		dir->pos += sizeof e;
-		if (e.in_use) {
-			strlcpy (name, e.name, NAME_MAX + 1);
-			ASSERT(!strcmp(e.name, ".") || strcmp(e.name, ".."));
-			return true;
-		}
-	}
-	return false;
+    // Read directory entries one by one
+    while (inode_read_at(dir->inode, &e, sizeof(e), dir->pos) == sizeof(e)) {
+        dir->pos += sizeof(e);
+        if (e.in_use && strcmp(e.name, ".") != 0 && strcmp(e.name, "..") != 0) {
+            strlcpy(name, e.name, NAME_MAX + 1);
+            return true;
+        }
+    }
+    return false;
 }
+
 
 /*function to get directory and file/folder in that directory based on the input directory*/
 bool parser_path_and_file(const char *input_dir, struct dir *dir, char *filename){
@@ -305,27 +312,6 @@ fail_no_inode:
 	dir_close(current_dir);
 	return false; 
 }
-
-
-//Solution_4 just put here in case needed during debuging
-
-/* Get the name of file from the full path and store. */
-// bool
-// get_fname_from_path (const char* path, char* name) {
-// 	char *last_slash = strrchr(path, '/');
-
-// 	if (last_slash) {
-// 		if (strlen(last_slash) > NAME_MAX + 1)
-// 			return false;
-// 		strlcpy(name, last_slash + 1, NAME_MAX + 1);
-// 	}
-// 	else {
-// 		if (strlen(path) > NAME_MAX + 1)
-// 			return false;
-// 		strlcpy(name, path, NAME_MAX + 1);
-// 	}
-// 	return true;
-// }
 
 bool
 get_fname_from_path(const char *path, char *name) {
