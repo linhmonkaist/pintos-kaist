@@ -127,56 +127,63 @@ filesys_create (const char *name, off_t initial_size) {
 #ifdef EFILESYS
 struct file *
 filesys_open (const char *name) {
-	struct file *result = NULL;
-	char *file_name = NULL;
-	struct dir *dir = NULL;
-	struct inode *inode = NULL;
+    struct file *result = NULL;
+    char *file_name = NULL;
+    struct dir *dir = NULL;
+    struct inode *inode = NULL;
 
-	if (!strcmp(name, "/"))
-		return dir_open_root();
+    if (!strcmp(name, "/"))
+        return dir_open_root();
 
-	file_name = (char *) malloc(NAME_MAX + 1);
-	if (!file_name)
-		return NULL;
-	// printf("I'm in after malloc in filesys open \n");
-	if (!get_fname_from_path(name, file_name))
-		goto free;
-	// printf("I'm in after get_fname_from_path in filesys open \n");
-	dir = get_dir_from_path(name);
-	// printf("I'm in after get dir from path \n");
-	if (dir == NULL)
-		goto close;
+    // allocate memory for file name
+    file_name = (char *) malloc(NAME_MAX + 1);
+    if (file_name == NULL)
+        return NULL;
 
-	dir_lookup(dir, file_name, &inode);
-	if (inode == NULL)
-		goto close;
+    // extract the file name from the given path
+    if (!get_fname_from_path(name, file_name))
+        goto cleanup;
 
-	if (inode_is_symlink(inode))
-		result = filesys_open(inode_symlink_path(inode));
-	else
-		result = file_open(inode);
-	// printf("I'm nearly close \n");
-close:
-	dir_close(dir);
-free:
-// printf("I'm going to free \n");
-	free(file_name);
-	// if (result == NULL ) printf("return a null val \n"); 
- 	return result;
+    // directory from path
+    dir = get_dir_from_path(name);
+    if (dir == NULL)
+        goto cleanup;
+
+    // inode associated with the file name
+    dir_lookup(dir, file_name, &inode);
+    if (inode == NULL)
+        goto cleanup;
+
+    // inode is a symlink, open the target file instead
+    if (inode_is_symlink(inode)) {
+        result = filesys_open(inode_symlink_path(inode));
+    } else {
+        result = file_open(inode);
+    }
+
+cleanup:
+    // Close the directory and free allocated memory
+    if (dir != NULL)
+        dir_close(dir);
+    if (file_name != NULL)
+        free(file_name);
+
+    return result;
 }
 #else
 struct file *
 filesys_open (const char *name) {
-	struct dir *dir = dir_open_root ();
-	struct inode *inode = NULL;
+    struct dir *dir = dir_open_root ();
+    struct inode *inode = NULL;
 
-	if (dir != NULL)
-		dir_lookup (dir, name, &inode);
-	dir_close (dir);
+    if (dir != NULL)
+        dir_lookup (dir, name, &inode);
+    dir_close (dir);
 
-	return file_open (inode);
+    return file_open (inode);
 }
 #endif
+
 
 /* Deletes the file named NAME.
  * Returns true if successful, false on failure.
