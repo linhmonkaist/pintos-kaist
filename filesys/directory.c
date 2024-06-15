@@ -254,60 +254,6 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 	return false;
 }
 
-/*get path and open it. Path can be absolute or relative*/
-// struct dir *get_dir_from_path(const char *path){
-// 	struct dir *current_working_dir = thread_current() -> working_dir; 
-// 	struct dir *new_dir = NULL; 
-
-// 	//check the valid of path
-// 	if (strlen(path) ==  0) return NULL; 
-
-// 	//copy path 
-// 	char *copy_path = malloc(strlen(path) + 1);
-// 	if (!copy_path) return NULL; 
-
-// 	memcpy(copy_path, path, strlen(path) + 1);  
-
-// 	//if path is absolute, open the root
-// 	if (copy_path[0] == '/'){
-// 		new_dir = dir_open_root(); 
-// 	} else {
-// 		new_dir = dir_reopen(current_working_dir); 
-// 	}
-
-// 	//go in each dir of the path and open it with new_dir
-// 	char *temp = NULL; 
-// 	char *token = strtok_r(copy_path, '/', &temp);
-// 	char *cur = strtok_r(NULL, '/', &temp);
-// 	struct inode *inode; 
-
-// 	while (token != NULL && cur != NULL){
-// 		dir_lookup(new_dir, token, &inode);
-// 		if (inode == NULL) goto fail_no_inode;
-// 		dir_close(new_dir);
-
-// 		if (inode_is_symlink(inode)){
-// 			char *pointed_path = inode_get_sym_path(inode); 
-
-// 			new_dir = get_dir_from_path(pointed_path); 
-// 			if (new_dir == NULL) PANIC("symbolic name parser error"); 
-// 			return new_dir; 
-// 		}
-// 		if (!inode_is_dir(inode)) goto fail_close_inode; 
-// 		new_dir = dir_open(inode); 
-// 		token = cur; 
-// 		cur = strtok_r(NULL, '/', &temp);
-// 	}
-
-// 	return new_dir; 
-// fail_close_inode: 
-// 	inode_close(inode);
-// fail_no_inode: 
-// 	free(copy_path);
-// 	dir_close(new_dir);
-// 	return NULL; 
-// }
-
 /*function to get directory and file/folder in that directory based on the input directory*/
 bool parser_path_and_file(const char *input_dir, struct dir *dir, char *filename){
 	if (strlen(input_dir) == 0){
@@ -364,24 +310,56 @@ fail_no_inode:
 //Solution_4 just put here in case needed during debuging
 
 /* Get the name of file from the full path and store. */
-bool
-get_fname_from_path (const char* path, char* name) {
-	char *last_slash = strrchr(path, '/');
+// bool
+// get_fname_from_path (const char* path, char* name) {
+// 	char *last_slash = strrchr(path, '/');
 
-	if (last_slash) {
-		if (strlen(last_slash) > NAME_MAX + 1)
-			return false;
-		strlcpy(name, last_slash + 1, NAME_MAX + 1);
-	}
-	else {
-		if (strlen(path) > NAME_MAX + 1)
-			return false;
-		strlcpy(name, path, NAME_MAX + 1);
-	}
-	return true;
+// 	if (last_slash) {
+// 		if (strlen(last_slash) > NAME_MAX + 1)
+// 			return false;
+// 		strlcpy(name, last_slash + 1, NAME_MAX + 1);
+// 	}
+// 	else {
+// 		if (strlen(path) > NAME_MAX + 1)
+// 			return false;
+// 		strlcpy(name, path, NAME_MAX + 1);
+// 	}
+// 	return true;
+// }
+
+bool
+get_fname_from_path(const char *path, char *name) {
+    // Ensure the path is valid
+    if (path == NULL || name == NULL) {
+        return false;
+    }
+
+    const char *last_slash = strrchr(path, '/');
+
+    const char *file_name = (last_slash != NULL) ? (last_slash + 1) : path;
+
+    if (strlen(file_name) > NAME_MAX) {
+        return false;
+    }
+
+    strlcpy(name, file_name, NAME_MAX + 1);
+
+    return true;
 }
 
 /* Get last directory from the path and open. */
+/* Custom strdup function */
+char *my_strdup(const char *s) {
+    size_t len = strlen(s) + 1;
+    char *copy = malloc(len);
+    if (copy != NULL) {
+        memcpy(copy, s, len);
+    }
+    return copy;
+}
+
+/* Get last directory from the path and open. */
+
 struct dir *
 get_dir_from_path (const char *__path) {
 	struct dir *dir = NULL;

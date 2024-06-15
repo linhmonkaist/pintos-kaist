@@ -26,6 +26,7 @@ void inode_close (struct inode *);
 void inode_remove (struct inode *);
 off_t inode_read_at (struct inode *, void *, off_t size, off_t offset);
 off_t inode_write_at (struct inode *, const void *, off_t size, off_t offset);
+bool inode_extend(struct inode *inode, off_t new_length);
 void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
@@ -35,5 +36,6 @@ bool inode_is_dir (const struct inode *);
 bool inode_set_symlink (disk_sector_t inode_sector, const char *target);
 bool inode_is_symlink (const struct inode *inode);
 char *inode_symlink_path (const struct inode* inode);
+
 
 #endif /* filesys/inode.h */

@@ -65,21 +65,6 @@ byte_to_sector (const struct inode *inode, off_t pos) {
    
     return cluster_to_sector(cluster);
 
-	// off_t clst_num;
-	// cluster_t clst_cur;
-	// disk_sector_t ret = -1;
-
-	// ASSERT (inode != NULL);
-	// if (pos < inode->data.length) {
-	// 	clst_num = pos / (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
-	// 	clst_cur = sector_to_cluster(inode->data.start);
-	// 	while (clst_num > 0) {
-	// 		clst_cur = fat_get(clst_cur);
-	// 		clst_num--;
-	// 	}
-	// 	ret = cluster_to_sector(clst_cur);
-	// }
-	// return ret;
 }
 /* Start -  FAT */
 #else
@@ -312,6 +297,38 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) {
 	return bytes_read;
 }
 
+bool inode_extend(struct inode *inode, off_t new_length) {
+    cluster_t last_cluster = sector_to_cluster(inode->data.start);
+
+    // Find the last cluster in the chain
+    while (fat_get(last_cluster) != EOChain) {
+        last_cluster = fat_get(last_cluster);
+    }
+
+    // Calculate the number of new clusters needed
+    size_t old_cluster_count = DIV_ROUND_UP(inode->data.length, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
+    size_t new_cluster_count = DIV_ROUND_UP(new_length, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
+    size_t clusters_needed = new_cluster_count - old_cluster_count;
+
+    // Allocate new clusters
+    cluster_t current_cluster = last_cluster;
+    for (size_t i = 0; i < clusters_needed; i++) {
+        cluster_t next_cluster = fat_create_chain(current_cluster);
+        if (next_cluster == 0) {
+            // Allocation failed, remove any newly allocated clusters
+            fat_remove_chain(sector_to_cluster(inode->data.start), last_cluster);
+            return false;
+        }
+        current_cluster = next_cluster;
+    }
+
+    // Update inode length
+    inode->data.length = new_length;
+    disk_write(filesys_disk, inode->sector, &inode->data);
+    return true;
+}
+
+
 /* Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
  * Returns the number of bytes actually written, which may be
  * less than SIZE if end of file is reached or an error occurs.
@@ -402,6 +419,71 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
 	return bytes_written;
 }
+
+// off_t
+// inode_write_at (struct inode *inode, const void *buffer_, off_t size, off_t offset) {
+//     const uint8_t *buffer = buffer_;
+//     off_t bytes_written = 0;
+//     uint8_t *bounce = NULL;
+
+//     if (inode->deny_write_cnt)
+//         return 0;
+
+// #ifdef EFILESYS
+//     /* Extend the file if necessary */
+//     if (inode->data.length < size + offset) {
+//         if (!inode_extend(inode, size + offset)) {
+//             return 0;
+//         }
+//     }
+// #endif
+
+//     /* Allocate bounce buffer */
+//     bounce = malloc(DISK_SECTOR_SIZE);
+//     if (bounce == NULL) {
+//         return 0;
+//     }
+
+//     while (size > 0) {
+//         /* Sector to write, starting byte offset within sector. */
+//         disk_sector_t sector_idx = byte_to_sector(inode, offset);
+//         int sector_ofs = offset % DISK_SECTOR_SIZE;
+
+//         /* Bytes left in inode, bytes left in sector, lesser of the two. */
+//         off_t inode_left = inode_length(inode) - offset;
+//         int sector_left = DISK_SECTOR_SIZE - sector_ofs;
+//         int min_left = inode_left < sector_left ? inode_left : sector_left;
+
+//         /* Number of bytes to actually write into this sector. */
+//         int chunk_size = size < min_left ? size : min_left;
+//         if (chunk_size <= 0)
+//             break;
+
+//         if (sector_ofs == 0 && chunk_size == DISK_SECTOR_SIZE) {
+//             /* Write full sector directly to disk. */
+//             disk_write(filesys_disk, sector_idx, buffer + bytes_written);
+//         } else {
+//             /* We need a bounce buffer. */
+//             if (sector_ofs > 0 || chunk_size < sector_left) {
+//                 disk_read(filesys_disk, sector_idx, bounce);
+//             } else {
+//                 memset(bounce, 0, DISK_SECTOR_SIZE);
+//             }
+//             memcpy(bounce + sector_ofs, buffer + bytes_written, chunk_size);
+//             disk_write(filesys_disk, sector_idx, bounce);
+//         }
+
+//         /* Advance. */
+//         size -= chunk_size;
+//         offset += chunk_size;
+//         bytes_written += chunk_size;
+//     }
+
+//     free(bounce);
+
+//     return bytes_written;
+// }
+
 
 /* Disables writes to INODE.
    May be called at most once per inode opener. */

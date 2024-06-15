@@ -79,7 +79,7 @@ filesys_create (const char *name, off_t initial_size) {
 
     struct dir *dir = get_dir_from_path(name);
     if (dir == NULL) {
-        free(file_name);
+	free(file_name);
         return false;
     }
 
