@@ -121,10 +121,10 @@ dir_lookup (const struct dir *dir, const char *name,
 	ASSERT (name != NULL);
 
 	if (lookup (dir, name, &e, NULL))
-		*inode = inode_open (e.inode_sector);
+		{ *inode = inode_open (e.inode_sector); ;}
 	else
 		*inode = NULL;
-
+	// printf("done dir look up \n");
 	return *inode != NULL;
 }
 
@@ -309,54 +309,64 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 // }
 
 /*function to get directory and file/folder in that directory based on the input directory*/
-bool parser_path_and_file(const char *input_dir, struct dir *dir, char *filename){
+bool parser_path_and_file(const char *input_dir, struct dir **dir, char *filename){
+	// printf("input path: %s \n", input_dir);
 	if (strlen(input_dir) == 0){
-		dir = thread_current() -> working_dir; 
-		return true;  
+		*dir = thread_current() -> working_dir; 
+		return false;  
 	}
 
 	char *copy_dir = calloc(1, strlen(input_dir) + 1);
 	memcpy(copy_dir, input_dir, strlen(input_dir));
 
-	struct dir *current_dir; 
-	if (input_dir[0] == '/') current_dir = dir_open_root();
-	else current_dir = thread_current() -> working_dir; 
+	if (copy_dir[0] == '/') *dir = dir_open_root();
+	else *dir = dir_reopen (thread_current() -> working_dir); 
 
 	struct inode *inode = NULL; 
 	char *temp;
 	char *token = strtok_r(copy_dir, "/", &temp);
 	char *next_token = strtok_r(NULL, "/", &temp); 
-
+	// printf("before while loop \n");
 	while (token != NULL){
 		//if token current is near last -> save file name and return dir, file
 		if (next_token == NULL){
 			memcpy(filename, token, sizeof(token) + 1);
+			// printf("go to have file name %s \n", filename);
 			return true; 
 		}
 
 		//if many dir remains
-		dir_lookup(current_dir, token, inode);
+		// printf("before dir look up %s \n", token); 
+		dir_lookup(*dir, token, &inode);
+		// printf("after dir look up \n"); 
 		if (inode == NULL) goto fail_no_inode; 
-		dir_close(current_dir); 
+		dir_close(*dir); 
 
 		if (inode_is_symlink(inode)){
 			char *pointed_path = inode_symlink_path(inode); 
 
-			bool res = parser_path_and_file(pointed_path, current_dir, filename); 
+			bool res = parser_path_and_file(pointed_path, *dir, filename); 
+			// printf("in symlink, got filename: %s from path: %s", filename, pointed_path);
 			if (res = false ) PANIC("symbolic name parser error"); 
-			return true; 
+			inode_close(inode);
+			dir_lookup(*dir, filename, &inode);
+			return true;
 		}
+		// printf("before check node is dir \n");
 		if (!inode_is_dir(inode)) goto fail_close_inode; 
-		current_dir = dir_open(inode); 
+		*dir = dir_open(inode); 
 		token = next_token; 
 		next_token = strtok_r(NULL, "/" , &temp);
 	}
+
+	// printf("returned path and filename: %s \n", filename);
+	return true; 
 
 fail_close_inode: 
 	inode_close(inode);
 fail_no_inode: 
 	free(copy_dir);
-	dir_close(current_dir);
+	// dir_close(*dir);
 	return false; 
 }
 
@@ -450,7 +460,7 @@ get_dir_from_path (const char *__path) {
 		remain = strtok_r(NULL, "/", &save);
 	}
 	// PANIC("in get_dir_from_path, %s , %s \n", parsing, remain);
-	// free(old);
+	free(old);
 	// printf("I'm in the get dir from path \n"); 
 	return dir;
 
@@ -465,8 +475,9 @@ fail:
 /* Change directory if name is exist in current directory. */
 bool
 dir_chdir (const char* path) {
+	// printf("call change dir with path: %s \n", path);
 	struct inode *inode = NULL;
-	struct dir *new_dir = NULL;
+	struct dir *new_dir = malloc(sizeof(struct dir));
 	char *name_dir = NULL;
 	bool ret = false;
 
@@ -474,29 +485,35 @@ dir_chdir (const char* path) {
 	if (strcmp(path, "/") == 0) {
 		dir_close(thread_current()->working_dir);
 		thread_current()->working_dir = dir_open_root();
-		ret = true;
-		goto ret;
+		return true; 
 	}
 
 	name_dir = (char *) malloc(NAME_MAX + 1);
-	if (name_dir == NULL)
+	if (name_dir == NULL || new_dir == NULL)
 		goto ret;
 
-	if (!get_fname_from_path(path, name_dir))
-		goto free;
-
-	new_dir = get_dir_from_path(path);
-	if (new_dir == NULL)
-		goto free;
-
+	if (!parser_path_and_file(path, &new_dir, name_dir)) goto free; 
+	// if (!get_fname_from_path(path, name_dir))
+	// 	goto free;
+	// printf("get result %s \n", name_dir); 
+	// new_dir = get_dir_from_path(path);
+	if (new_dir == NULL) {
+		// printf("go to null new_dir \n"); 
+		// new_dir = dir_open_root();
+		goto free;  
+		}
+		// goto free;
+	// printf("after new_dir == NULL \n"); 
 	if (!dir_lookup(new_dir, name_dir, &inode)
 		|| inode == NULL || !inode_is_dir(inode)) {
+		// printf("fail in dir_lookup in change dir \n"); 
 		inode_close(inode);
 		goto close;
 	}
 
 	dir_close(thread_current()->working_dir);
 	thread_current()->working_dir = dir_open(inode);
+	// printf("success change dir \n"); 
 	ret = true;
 
 close:
@@ -510,8 +527,10 @@ ret:
 /* Make directory */
 bool
 dir_mkdir(const char* path) {
+	// printf("call make dir \n");
 	struct dir *curr_dir = NULL;
-	struct dir *new_dir = NULL;
+	// struct dir *new_dir = NULL;
+	struct dir *new_dir = malloc(sizeof(struct dir));
 	char *new_dir_name = NULL;
 	struct inode *inode = NULL;
 	disk_sector_t inode_sector = 0;
@@ -521,35 +540,42 @@ dir_mkdir(const char* path) {
 	if (new_dir_name == NULL)
 		return ret;
 
-	if (!get_fname_from_path(path, new_dir_name))
-		goto free;
+	// if (!get_fname_from_path(path, new_dir_name))
+	// 	goto free;
 
-	curr_dir = get_dir_from_path(path);
-	// printf("call make dir \n");
-	if (curr_dir == NULL)
-		goto free;
-
-	dir_lookup(curr_dir, new_dir_name, &inode);
+	// curr_dir = get_dir_from_path(path);
+	// printf("before call make dir %s \n", new_dir_name);
+	if (!parser_path_and_file(path, &new_dir, new_dir_name)) goto free; 
+	// printf("call make dir %s \n", new_dir_name);
+	if (new_dir == NULL)
+		{
+			// printf("go to \n"); 
+			goto free;}
+	// printf("before call dir_lookup \n"); 
+	dir_lookup(new_dir, new_dir_name, &inode);
 	if (inode != NULL) {
 		inode_close(inode);
 		goto close;
 	}
-
-	ret = ((inode_sector = cluster_to_sector(fat_create_chain(0)))
-			&& dir_create (inode_sector, 0)
-			&& dir_add (curr_dir, new_dir_name, inode_sector));
-
+	inode_sector = cluster_to_sector(fat_create_chain(0)); 
+	bool r1 = dir_create (inode_sector, 0); 
+	bool r2 = dir_add (new_dir, new_dir_name, inode_sector);
+	ret = (inode_sector
+			&& r1
+			&& r2);
+	// printf("return val in the middle: %d, r1: %d, r2: %d \n", ret, r1, r2);
 	if (!ret && inode_sector != 0)
 		fat_remove_chain(sector_to_cluster(inode_sector), 0);
 
 	new_dir = dir_open(inode_open(inode_sector));
 	dir_add(new_dir, ".", inode_sector);
-	dir_add(new_dir, "..", inode_get_inumber(dir_get_inode(curr_dir)));
+	dir_add(new_dir, "..", inode_get_inumber(dir_get_inode(new_dir)));
 	dir_close(new_dir);
 
 close:
-	dir_close(curr_dir);
+	// dir_close(new_dir);
 free:
 	free(new_dir_name);
+	// printf("return val: %d \n", ret);
 	return ret;
 }

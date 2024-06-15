@@ -83,6 +83,7 @@ void check_address (void *addr) {
 		SyS_exit(-1);
 }
 void SyS_exit (int status) {
+	printf("call exit for check address");
 	struct thread *t = thread_current();
 	t->exit_status = status;
 
@@ -182,6 +183,7 @@ syscall_create (struct intr_frame *f) {
 static uint64_t
 syscall_remove (struct intr_frame *f) {
 	const char *fname = (const char *) f->R.rdi;
+	// printf("call syscall remove: %s \n", fname); 
 	lock_acquire (&filesys_lock);
 	int ret = filesys_remove (fname);
 	lock_release (&filesys_lock);
@@ -243,7 +245,6 @@ syscall_open (struct intr_frame *f) {
 	get_file_with_fd(filde, fd, obj, t, file); 
 		
 	lock_release (&filesys_lock);
-	// printf("return fd: %d \n", fd); 
 	return fd;
 }
 
@@ -327,6 +328,8 @@ syscall_write (struct intr_frame *f) {
 		putbuf(f->R.rsi, f->R.rdx);
 		return f->R.rdx; 
 	}
+	if (file_is_dir(filde->obj->file) == true)
+		return -1;
 	lock_acquire (&filesys_lock);
 	int32_t ret = file_write (filde->obj->file, f->R.rsi, f->R.rdx);
 	lock_release (&filesys_lock);
@@ -425,19 +428,30 @@ void syscall_munmap(void *addr){
 #endif
 
 #ifdef EFILESYS
-bool SyS_chdir (const char *dir) {
-	check_address(dir);
+// bool SyS_chdir (const char *dir) {
+// 	check_address(dir);
 
-	if (strlen(dir) == 0){
-		return false;
+// 	if (strlen(dir) == 0){
+// 		return false;
+// 	}
+
+// 	return dir_chdir(dir);
+// }
+bool syscall_chdir(const char *direction){
+	// printf("call syscall change dir: %s \n", direction); 
+	if (!is_user_vaddr(direction)){
+		thread_current() -> exit_status = -1; 
+		thread_exit(); 
 	}
-
-	return dir_chdir(dir);
+	if (strlen(direction) == 0){
+		return false;
+	} 
+	return dir_chdir(direction); 
 }
 
 bool SyS_mkdir (const char *dir) {
 	check_address(dir);
-
+	// printf("system call in make dir: %s \n", dir); 
 	return dir_mkdir(dir);
 }
 
@@ -469,28 +483,7 @@ int SyS_symlink (const char *target, const char *linkpath) {
 }
 #endif
 // #ifdef EFILESYS 
-// bool syscall_chdir(const char *direction){
-// 	printf("input direction in change dir: %s \n", direction); 
-// 	if (!is_user_vaddr(direction)){
-// 		thread_current() -> exit_status = -1; 
-// 		thread_exit(); 
-// 	}
-// 	if (strlen(direction) == 0){
-// 		return false;
-// 	}
-// 	if (strcmp(direction, "/") == 0){
-// 		dir_close(thread_current() -> working_dir); 
-// 		thread_current() -> working_dir = dir_open_root();
-// 		return true;
-// 	}
-// 	struct dir *new_dir = get_dir_from_path(direction); 
-// 	if (new_dir == NULL) return false; 
 
-// 	dir_close(thread_current() -> working_dir); 
-// 	thread_current() -> working_dir = new_dir; 
-// 	printf("change dir done \n"); 
-// 	return true; 
-// }
 
 // bool syscall_mkdir(const char *new_dir){
 // 	printf("input direction in make dir: %s \n", new_dir); 
@@ -614,6 +607,7 @@ syscall_handler (struct intr_frame *f) {
 			f->R.rax = syscall_create (f);
 			break;
 		case SYS_REMOVE:
+			// printf("call syscall remove \n"); 
 			if (!pointer_validate (fname)){
 				thread_current() -> exit_status = -1;
 				thread_exit(); 
@@ -625,6 +619,7 @@ syscall_handler (struct intr_frame *f) {
 				thread_current ()-> exit_status = -1;
 				thread_exit ();
 			}
+			// printf("call open in syscall \n"); 
 			f->R.rax = syscall_open (f);
 			break;
 		case SYS_FILESIZE:
@@ -679,7 +674,7 @@ syscall_handler (struct intr_frame *f) {
 // #endif
 #ifdef EFILESYS
 		case SYS_CHDIR:
-			f->R.rax = SyS_chdir(f->R.rdi);
+			f->R.rax = syscall_chdir(f->R.rdi);
 			break;
 		case SYS_MKDIR:
 			f->R.rax = SyS_mkdir(f->R.rdi);

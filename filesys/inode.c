@@ -185,6 +185,7 @@ inode_open (disk_sector_t sector) {
 	inode->deny_write_cnt = 0;
 	inode->removed = false;
 	disk_read (filesys_disk, inode->sector, &inode->data);
+	// printf("done return inode %d \n", *inode);
 	return inode;
 }
 
@@ -454,7 +455,7 @@ inode_symlink_path (const struct inode* inode){
 }
 
 
-// /*get real pointed path from a symbolic path*/
-// char *inode_get_sym_path(const struct inode *inode){
-// 	return inode -> data.symlink_path; 
-// }
+/*get real pointed path from a symbolic path*/
+char *inode_get_sym_path(const struct inode *inode){
+	return inode -> data.symlink_path; 
+}
